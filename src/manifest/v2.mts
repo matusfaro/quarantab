@@ -10,9 +10,16 @@ const manifest: ManifestTypeV2 = {
   version: pkg.version,
   description: pkg.description,
   icons: {
-    "128": "public/icon-128.png",
+    "128": "public/logo.svg",
   },
   web_accessible_resources: ["public/*", "assets/*"],
+  permissions: [
+    "proxy",
+    "tabs",
+    "cookies",
+    "contextualIdentities",
+    "<all_urls>",
+  ],
 };
 
 function getManifestV2(pageDirMap: { [x: string]: any }): ManifestTypeV2 {
@@ -37,7 +44,7 @@ function getManifestV2(pageDirMap: { [x: string]: any }): ManifestTypeV2 {
   if (pages.indexOf("popup") > -1) {
     manifest.browser_action = {
       default_popup: pageDirMap["popup"],
-      default_icon: "public/icon-34.png",
+      default_icon: "public/logo.svg",
     };
   }
 

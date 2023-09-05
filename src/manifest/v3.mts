@@ -10,13 +10,22 @@ const manifest: ManifestTypeV3 = {
   version: pkg.version,
   description: pkg.description,
   icons: {
-    "128": "public/icon-128.png",
+    "128": "public/logo.svg",
   },
   web_accessible_resources: [
     {
       resources: ["public/*", "assets/*"],
       matches: ["<all_urls>"],
     },
+  ],
+  permissions: [
+    "proxy",
+    "tabs",
+    "cookies",
+    "contextualIdentities",
+  ],
+  host_permissions: [
+    "<all_urls>",
   ],
 };
 
@@ -43,7 +52,7 @@ function getManifestV3(pageDirMap: { [x: string]: any }): ManifestTypeV3 {
   if (pages.indexOf("popup") > -1) {
     manifest.action = {
       default_popup: pageDirMap["popup"],
-      default_icon: "public/icon-34.png",
+      default_icon: "public/logo.svg",
     };
   }
   

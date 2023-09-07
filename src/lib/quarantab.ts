@@ -17,11 +17,14 @@ export enum QuarantineStatus {
 }
 
 export const NoneColor = 'lightgrey';
+export const NoneColorRgb = '#D3D3D3';
 export const OpenColor = 'red';
+export const OpenColorRgb = '#F06F46';
 export const ClosedColor = 'green';
+export const ClosedColorRgb = '#72C935';
 
-export const OpenText = 'OPEN';
-export const ClosedText = 'LOCKED';
+export const OpenText = '';
+export const ClosedText = ' - Locked';
 
 export class QuaranTab {
     readonly _runner: Runner;
@@ -186,7 +189,7 @@ export class QuaranTab {
     }
 
     _getQuaranTabContainerName(isLocked: boolean): string {
-        return `QuaranTab ${isLocked ? ClosedText : OpenText}`;
+        return `QuaranTab${isLocked ? ClosedText : OpenText}`;
     }
 
     _getStatusFromContainerName(name: string): QuarantineStatus {

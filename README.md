@@ -1,107 +1,129 @@
-# Browser Extension Template
 
-## w/ React Preact Typescript ESBuild
+# QuarantTab
+<img src='img/screenshot.png' width=300>
 
-![Generic badge](https://img.shields.io/badge/build-success-brightgreen.svg)
+Safely use sensitive data with online tools. Browser extension to cut-off network access to a website to prevent it from phoning home. This allows you to input sensitive data into a website without worrying about it being stolen.
 
-> Browser Extension Template with ESbuild builds, support for React, Preact, Typescript, Tailwind, Manifest V3/V2 support and multi browser build including Chrome, Firefox, Safari, Edge, Brave.
+## Use cases
 
-## Builtin
+Do use this to convert/parse sensitive data:
 
-- Fast 100ms builds: ESBuild
-- Manifest v3/v2 in TS
-- 17+ Browsers Support
-- 8+ Pages: content, bookmarks, popup, ...
-- Auto Opens Browser
-- Run Multiple Browsers in Parallel
-- Autoreloads Browser
-- Isolated Browser Profiles
+- Parse a live JWT token in https://jwt.io
+- Decode a Base64 Authorization header
+- Hash a password for /etc/shadow
+- Parse a Protobuf message
 
- ## Commands
+## Bad use cases
+
+Do **not** use this extension to **generate** sensitive data:
+
+- Generate a strong password online
+- Generate a Bitcoin wallet online
+- Generate a PGP key online
+
+A malicious website may show you pre-generated data which may seem random to you, but is actually known to the attacker even before you load the website. Cutting off network access will not prevent this situation.
+
+## Where to get it
+
+I would recommend to review the code, build the extension yourself and install it manually.
+
+If you simply install the extension from the Firefox Add-ons store, you are implicitly trusting me that the extension does what it says it does.
+
+You were warned: [Placeholder link to store]
+
+## How to use
+
+### Quarantine
+
+Open any website you wish to use with sensitive data. Click the extension icon to quarantine the website. This will cut-off network access to the website. The website will still be able to run JavaScript, but it will not be able to make any network requests.
+
+<img src='img/screenshot-quarantine.png' width=500>
+
+### Lock
+
+If you kept `Auto-lock` enabled, this step is only briefly shown while the page loads. When the page is completely loaded, the extension will automatically lock the website, cutting off the network access.
+
+<img src='img/screenshot-lock.png' width=500>
+
+### Use
+
+At this point, the website is completely locked down. You can now safely use the website and input sensitive data. No data will leak out of the website.
+
+If a website stops working, it probably means that it depends on additional resources that it cannot fetch anymore because network access is cut-off.
+
+Some tools actually work by sending your data to a server for processing, so they will not work with this extension by design.
+
+<img src='img/screenshot-use.png' width=500>
+
+### Purge
+
+When you are done using the site, click the extension icon and click the purge button to delete all website data.
+
+<img src='img/screenshot-purge.png' width=500>
+
+## How it works
+
+This extension takes advantage of Mozilla Firefox's [contextualIdentities API](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/contextualIdentities) to create temporary Containers in order to:
+- Isolate a website from the rest of the browser
+- Cut-off network access to just this Container
+- Easily delete all data when you are done using the website
+
+Interesting part is that the API semi-functions even without the [Multi-Account Containers extension](https://github.com/mozilla/multi-account-containers) installed with a caveat:
+- When calling `browser.contextualIdentities.remove`, the Container is removed, but open tabs continue to be open and seem to be using a zombie-leftover of this container. The container cannot be referenced, but the site continues to operates as if it exists. This is a bug in Firefox. To solve this, I explicitly close all remaining tabs in that Container.
+
+Attacks this extension protects against:
+- Network access: Container is routed to a non-existent Socks proxy pointing to 127.0.0.1
+- DNS leaks by routing DNS requests via Socks: site could try to resolve my-sensitive-info.badsite.com
+- Storing sensitive data in Storage and Cookies
+- Communicating with other websites
+
+Out of scope attacks:
+- Malicious other extensions communicating with the website
+- Socks proxy running on localhost allowing communication with the website
+- Container exploits
+- Pre-generated data (e.g. using a Bitcoin Wallet Generator that shows you one of 100 pre-generated wallets)
+
+Potential implementation in Chromium (Would love feedback here):
+- Use private window as a temporary container
+
+## Permissions
+
+- "proxy" - Required to cut-off network access to the website
+- "tabs" - Required to re-open a tab in a new container
+- "cookies" - Required for manipulating Container data
+- "contextualIdentities" - Required for creating/deleting Containers
+- "<all_urls>" - Required to use with any website
+
+## Bug bounty
+
+If you find a bug, please report it to me. A bug bounty is available for this project as long as it meets the following criteria:
+
+1. The bug shows an exploit to exfiltrate data out of a website that is under a locked-down quarantine.
+2. You are the first person to report the bug.
+3. There are funds available in the bug bounty.
+4. The amount is proportional to the severity of the bug at our discretion.
+5. For an exploit that leaks any data under all circumstances, the bounty would be 100 USD.
+6. The bug exists in this extension or the design of it. It excludes explots in the browser itself, the contextualIdentities implementation or isolation guarantees.
+
+### Bug bounty remaining pool
+
+100 USD
+
+_the amount will grow in the future proportionally to my confidence_
+
+### Bug bounty history
+
+No exploits yet.
+
+## Building
 
 ```sh
 # Install packages
 npm install
 
-# Live Dev for multiple browsers
-npm run start [browser]
-# npm run start chrome firefox safari
+# Live Dev
+npm run start firefox
 
-# Build for multiple browsers
-npm run build [browser]
-# npm run build chrome firefox safari
+# Build
+npm run build firefox
 ```
-
-That's it, if you got the browsers in the start command installed, it automatically builds for that, starts all of them, loads the extensions and reloads them on change. ESBuild makes sure the builds and reloads are really fast.
-
-See browser support below.
-
-## Supports
-
-- ESBuild
-- React 18
-- Typescript
-- Preact X
-- PostCSS
-- TailwindCSS
-- CSS Modules
-
-Simply remove or don't use the technologies you don't like.
-
-Scripts & Pages (located in `src/pages`):
-
-- background
-- content
-- history
-- options
-- popup
-- bookmarks  
-- devtools   
-- newtab
-- panel
-
-Just delete the folders of pages you don't require, the builds scripts detects automatically what's in there and adjusts the manifest automatically.
-
-Browsers:
-- arc
-- brave
-- chrome
-- chrome-beta
-- chrome-canary
-- chromium
-- edge
-- firefox
-- firefox-developer-editon
-- firefox
-- opera
-- orion *
-- safari *
-- safari-beta *
-- safari-technical-preview *
-- sidekick
-- vivaldi
-
-Browsers with * stars get a build, but needs to be launched manually, and extension needs to loaded manually with Xcode.
-
-## Notes
-
-If you want webpack build, checkout the webpack branch.
-
-In each of the pages folder, the target main script is the first of
-
-- index.html
-- index.ts
-- index.tsx
-- index.js
-- index.jsx
-- main.html
-- main.ts
-- main.tsx
-- main.js
-- main.jsx
-
-Put your injecting scripts in `public` directory that needs to imported via the `chrome.runtime.getURL` API.
-
-## Credits
-
-V2 wouldn't have been possible without my brilliant friend [Sayan Naskar](https://github.com/nascarsayan), the more credit we give him is less!

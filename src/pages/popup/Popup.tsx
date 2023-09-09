@@ -1,64 +1,80 @@
 import React, { useEffect, useState } from "react";
 
-import { ClosedColor, ClosedColorRgb, NoneColor, NoneColorRgb, OpenColor, OpenColorRgb, QuarantineStatus, Runner, getQuaranTabInstance } from "@src/lib/quarantab";
-import Logo from '@assets/img/logo.svg';
-import { Alert, Box, Button, Checkbox, Collapse, FormControlLabel, Grid, IconButton, SvgIcon, ThemeProvider, Tooltip, Typography } from "@mui/material";
+import { ClosedColorRgb, NoneColorRgb, OpenColorRgb, QuarantineStatus, Runner, getQuaranTabInstance } from "@src/lib/quarantab";
+import LogoRed from '@assets/img/logo-red.svg';
+import LogoGreen from '@assets/img/logo-green.svg';
+import LogoGrey from '@assets/img/logo-grey.svg';
+import { Alert, Box, Checkbox, Collapse, FormControlLabel, Step, StepLabel, Stepper, ThemeProvider, Tooltip, Typography } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
+import { Info } from "@mui/icons-material";
 
 export default function Popup(): JSX.Element {
 
   const [loading, setLoading] = useState<boolean>(true);
-  const [errorMsg, setErrorMsg] = useState<string>();
+  var [errorMsg, setErrorMsg] = useState<string>();
   const [lockAfterLoad, setLockAfterLoad] = useState<boolean>(true);
   const [currentTab, setCurrentTab] = useState<browser.tabs.Tab>();
   const [status, setStatus] = useState<QuarantineStatus>();
 
   useEffect(() => {
     if (!currentTab) {
-      browser.tabs.query({ active: true, currentWindow: true })
-      .then((tabs) => {
-        const newCurrentTab = tabs[0];
-        if (!newCurrentTab) {
-          setErrorMsg(`Cannot detect tab`);
-        }
-        setCurrentTab(newCurrentTab);
-      }).catch(err => {
-        setErrorMsg(`${err}`);
-      });
-    }
-  }, [currentTab]);
-
-  useEffect(() => {
-    if (!!currentTab) {
-      try {
-        getQuaranTabInstance(Runner.POPUP)
-          .checkStatus(currentTab.cookieStoreId)
-          .then((newStatus) => {
-            setStatus(newStatus);
-            setLoading(false);
+      const refreshCurrentWindow = () => {
+        browser.tabs.query({ active: true, currentWindow: true })
+          .then((tabs) => {
+            const newCurrentTab = tabs[0];
+            if (!newCurrentTab) {
+              setErrorMsg(`Cannot detect tab`);
+            }
+            setCurrentTab(newCurrentTab);
           }).catch(err => {
             setErrorMsg(`${err}`);
           });
-      } catch (err) {
-        setErrorMsg(`${err}`);
       }
+      refreshCurrentWindow();
+      getQuaranTabInstance(Runner.POPUP).setOnStatusChanged(() => refreshCurrentWindow());
+    }
+    else {
+      getQuaranTabInstance(Runner.POPUP)
+        .checkStatus(currentTab.cookieStoreId)
+        .then((newStatus) => {
+          setStatus(newStatus);
+          setLoading(false);
+        }).catch(err => {
+          setErrorMsg(`${err}`);
+        });
     }
   }, [currentTab]);
 
-  var info;
+  const eligibleForQuarantine = (tab: browser.tabs.Tab | undefined): string | true | undefined => {
+    if (!tab
+      || !tab.id
+      || !tab.cookieStoreId) {
+      return undefined;
+    }
+    if (tab.pinned) {
+      return 'Cannot quarantine pinned tabs';
+    }
+    if (!tab.url?.match(/^https?:\/\//)) {
+      return 'Unsupported URL scheme';
+    }
+    return true;
+  }
+  const eligibility = eligibleForQuarantine(currentTab);
+
+  var Logo = LogoGrey
   var showLockAfterLoad = false;
-  var bigButtonTooltip;
   var bigButtonAction;
   var bigButtonTitle;
   var bigButtonColor: 'success' | 'error' | 'info' = 'info';
   var color: string = NoneColorRgb;
+  if (eligibility !== true) {
+    bigButtonTitle = 'Quarantine';
+    errorMsg = errorMsg || eligibility;
+  }
   // Tab is not quarantined
   // Show button to put current tab in quarantine
-  // TODO detect tabs that cannot be quarantined like the browser settings page
-  if (status === QuarantineStatus.NONE && currentTab) {
-    info = 'This site is not managed by this extension.';
+  else if (status === QuarantineStatus.NONE && currentTab) {
     showLockAfterLoad = true;
-    bigButtonTooltip = 'Quarantine will re-open this page in a fresh new temporary container isolated from all other tabs.';
     bigButtonTitle = 'Quarantine';
     bigButtonAction = async () => {
       try {
@@ -78,10 +94,9 @@ export default function Popup(): JSX.Element {
   // Tab is in quarantined but not locked
   // Show button to lock tabs
   else if (status === QuarantineStatus.OPEN && currentTab) {
-    info = 'This site is quarantined in its own Container, but continues to have access to internet in order to load all of its assets.';
-    bigButtonTooltip = 'Locking will cut-off internet access to this container to prevent any site from phoning home.';
     bigButtonTitle = 'Lock';
     bigButtonColor = 'error';
+    Logo = LogoRed;
     color = OpenColorRgb;
     bigButtonAction = async () => {
       try {
@@ -96,15 +111,14 @@ export default function Popup(): JSX.Element {
   // Tab is quarantined AND locked
   // Show button to purge site and container
   else if (status === QuarantineStatus.CLOSED && currentTab) {
-    info = 'This site has no internet access. Any sensitive information will not leave your computer.';
-    bigButtonTooltip = 'Purge will delete this container and delete all data associated with it.';
     bigButtonTitle = 'Purge';
     color = ClosedColorRgb;
     bigButtonColor = 'success';
+    Logo = LogoGreen;
     bigButtonAction = async () => {
       try {
         setLoading(true);
-        await getQuaranTabInstance(Runner.POPUP).purgeQurantine(currentTab)
+        await getQuaranTabInstance(Runner.POPUP).purgeQurantine(currentTab.cookieStoreId)
         window.close();
       } catch (err) {
         setErrorMsg(`${err}`);
@@ -113,28 +127,25 @@ export default function Popup(): JSX.Element {
   }
   // Loading state
   else {
-    bigButtonTitle = '';
+    bigButtonTitle = 'Quarantine';
   }
 
-  // TODO check for this._browser.contextualIdentities and show message Containres extension is not installed
-  // TODO check for all permissions and show message that permissions are missing
   return (
     <ThemeProvider theme={{}}>
       <Box
-        minHeight={330}
+        minHeight={250}
         width={400}
         display='flex'
         flexDirection='column'
       >
-        <Box display='flex' justifyContent='center' sx={{ m: 4 }}>
-          <img src={Logo} width={32} height={32} />
+        <Box display='flex' justifyContent='center' alignItems='flex-end' sx={{ m: 4, marginBottom: 0 }}>
+          <img src={Logo} width={48} height={48} />
           <Typography variant='h4' component='h1' sx={{ marginLeft: 4 }}>
             QuaranTab
           </Typography>
         </Box>
 
         <Box textAlign='center' sx={{ m: 2, marginBottom: 0 }} >
-          <Tooltip title={(<Typography>{bigButtonTooltip}</Typography>)} arrow>
             <LoadingButton
               variant='contained'
               size='large'
@@ -145,11 +156,10 @@ export default function Popup(): JSX.Element {
               sx={{ m: 1, minWidth: 150 }}
             >
               {bigButtonTitle}
-            </LoadingButton>
-          </Tooltip>
+          </LoadingButton>
           <br />
           <Collapse in={showLockAfterLoad} appear>
-            <Tooltip title={(<Typography>Waits for the page to load and automatically locks the container cutting off its network access.</Typography>)} arrow>
+            <Box display='flex' justifyContent='center'>
               <FormControlLabel
                 control={(
                   <Checkbox
@@ -157,33 +167,51 @@ export default function Popup(): JSX.Element {
                     onClick={() => setLockAfterLoad(!lockAfterLoad)}
                   />
                 )}
-                label="Auto lock"
+                label='Auto-lock'
               />
-            </Tooltip>
+              <Tooltip disableInteractive arrow title={(<Typography>
+                Lock after page fully loads.
+              </Typography>)}>
+                <Info fontSize='small' />
+              </Tooltip>
+            </Box>
           </Collapse>
         </Box>
 
         <Box flexGrow={1} />
 
         <Collapse in={!!errorMsg}>
-          <Alert color='error' variant='filled' sx={{ m: 2 }} >
+          <Alert color='error' variant='outlined' sx={{ m: 2, marginTop: 0 }} >
             <Typography>
               {errorMsg}
             </Typography>
           </Alert>
         </Collapse>
 
-        <Collapse in={!!info}>
-          <Alert
-            variant='standard'
-            color={bigButtonColor}
-            icon={false}
-            sx={{ m: 2 }}
-          >
-            <Typography>
-              {info}
-            </Typography>
-          </Alert>
+        <Collapse in={!errorMsg}>
+          <Stepper activeStep={status || 0} sx={{ m: 2, marginTop: 0 }} >
+            <Step completed={QuarantineStatus.NONE < (status || 0)}>
+              <Tooltip disableInteractive arrow title={(<Typography>
+                Quarantine will re-open this page in a fresh new temporary container isolated from all other tabs.
+              </Typography>)}>
+                <StepLabel>Quarantine</StepLabel>
+              </Tooltip>
+            </Step>
+            <Step completed={QuarantineStatus.OPEN < (status || 0)}>
+              <Tooltip disableInteractive arrow title={(<Typography>
+                Locking will cut-off internet access to this container to prevent any site from phoning home.
+              </Typography>)}>
+                <StepLabel color='error'>Lock</StepLabel>
+              </Tooltip>
+            </Step>
+            <Step completed={QuarantineStatus.CLOSED < (status || 0)}>
+              <Tooltip disableInteractive arrow title={(<Typography>
+                Purge will delete this container and delete all data associated with it.
+              </Typography>)}>
+                <StepLabel color='success'>Purge</StepLabel>
+              </Tooltip>
+            </Step>
+          </Stepper>
         </Collapse>
       </Box>
     </ThemeProvider >

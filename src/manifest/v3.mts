@@ -10,7 +10,7 @@ const manifest: ManifestTypeV3 = {
   version: pkg.version,
   description: pkg.description,
   icons: {
-    "128": "public/logo.svg",
+    "128": "public/logo-grey.svg",
   },
   web_accessible_resources: [
     {
@@ -52,7 +52,7 @@ function getManifestV3(pageDirMap: { [x: string]: any }): ManifestTypeV3 {
   if (pages.indexOf("popup") > -1) {
     manifest.action = {
       default_popup: pageDirMap["popup"],
-      default_icon: "public/logo.svg",
+      default_icon: "public/logo-grey.svg",
     };
   }
   

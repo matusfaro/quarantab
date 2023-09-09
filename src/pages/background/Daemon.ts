@@ -20,7 +20,7 @@ export const BLOCK = {
 
 export default class Daemon {
   readonly _browser: typeof browser;
-  readonly _quarantab;
+  readonly _quarantab: QuaranTab;
 
   constructor(browserInstance: typeof browser, quarantab: QuaranTab) {
     this._browser = browserInstance;
@@ -41,10 +41,42 @@ export default class Daemon {
     }
   }
 
+  async onTabCreated(tab: browser.tabs.Tab): Promise<void> {
+    try {
+      await this._quarantab.onTabCreated(tab);
+    } catch (e: unknown) {
+      console.error(`Error in onTabRemoved listener: ${e as string}`)
+    }
+  }
+
+  async onTabActivated(activeInfo: browser.tabs._OnActivatedActiveInfo): Promise<void> {
+    try {
+      await this._quarantab.onTabActivated(activeInfo);
+    } catch (e: unknown) {
+      console.error(`Error in onTabActivated listener: ${e as string}`)
+    }
+  }
+
+  async onTabRemoved(tabId: number, removeInfo: browser.tabs._OnRemovedRemoveInfo): Promise<void> {
+    try {
+      await this._quarantab.onTabClosed(tabId);
+    } catch (e: unknown) {
+      console.error(`Error in onTabRemoved listener: ${e as string}`)
+    }
+  }
+
   run(): void {
-    // TODO proxy is undefined if no permission
-    this._browser.proxy?.onRequest.addListener(
-      this.onRequest.bind(this),
-      { urls: ['<all_urls>'] })
+    // Listen for network requests to block or allow network access
+    this._browser.proxy?.onRequest.addListener(this.onRequest.bind(this), { urls: ['<all_urls>'] })
+
+    // Listen for tab opening/closing to detect when a container is no longer used
+    // so the container can be safely cleaned up proactively
+    this._browser.tabs?.onCreated.addListener(this.onTabCreated.bind(this))
+    this._browser.tabs?.onRemoved.addListener(this.onTabRemoved.bind(this))
+
+    // Listen for tab activated to change extension icon to match current state
+    this._browser.tabs?.onActivated.addListener(this.onTabActivated.bind(this))
+
+    console.log(`Listening for network requests and tab events`);
   }
 }

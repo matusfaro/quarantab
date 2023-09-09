@@ -10,7 +10,7 @@ const manifest: ManifestTypeV2 = {
   version: pkg.version,
   description: pkg.description,
   icons: {
-    "128": "public/logo.svg",
+    "128": "public/logo-grey.svg",
   },
   web_accessible_resources: ["public/*", "assets/*"],
   permissions: [
@@ -44,7 +44,7 @@ function getManifestV2(pageDirMap: { [x: string]: any }): ManifestTypeV2 {
   if (pages.indexOf("popup") > -1) {
     manifest.browser_action = {
       default_popup: pageDirMap["popup"],
-      default_icon: "public/logo.svg",
+      default_icon: "public/logo-grey.svg",
     };
   }
 

@@ -17,6 +17,7 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.14.8",
     "@mui/lab": "^5.0.0-alpha.143",
     "@mui/material": "^5.14.8",
     "@types/firefox-webext-browser": "^111.0.1",

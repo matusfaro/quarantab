@@ -3,7 +3,7 @@ export enum Runner {
     POPUP = 'popup',
 }
 
-type Message = MessageSetQuarantineStatus | MessageOnTabActivated;
+type Message = MessageSetQuarantineStatus | MessageOnTabActivated | MessageOnTabUpdated;
 type MessageSetQuarantineStatus = {
     type: 'SET_QUARANTINE_STATUS',
     tabId: number,
@@ -13,6 +13,11 @@ type MessageSetQuarantineStatus = {
 }
 type MessageOnTabActivated = {
     type: 'ON_TAB_ACTIVATED',
+    tabId: number,
+    windowId: number,
+}
+type MessageOnTabUpdated = {
+    type: 'ON_TAB_UPDATED',
     tabId: number,
     windowId: number,
 }
@@ -214,12 +219,37 @@ export class QuaranTab {
     }
 
     /**
+     * Listener for the browser.tabs.onCreated callback.
+     * 
+     * @param tab 
+     * @returns 
+     */
+    async onTabUpdated(tab: browser.tabs.Tab): Promise<void> {
+        if (!tab.id || !tab.windowId) return;
+
+        // Send message to popup process to trigger the same update
+        // See _initializeRunner for receiving end.
+        if (this._runner === Runner.BACKGROUND) {
+            const message: MessageOnTabUpdated = {
+                type: 'ON_TAB_UPDATED',
+                tabId: tab.id,
+                windowId: tab.windowId,
+            };
+            this._browser.runtime.sendMessage(message)
+                .catch(err => { /* Expected if popup is closed */ });
+        }
+    }
+
+    /**
      * Listener for the browser.tabs.onActivated callback.
      * 
      * @param activeInfo 
      */
     async onTabActivated(activeInfo: browser.tabs._OnActivatedActiveInfo): Promise<void> {
-        this._activeTabChanged(activeInfo.tabId, activeInfo.windowId);
+        // Update icon to reflect current tab's quarantine status
+        if (this._runner === Runner.BACKGROUND) {
+            await this._updateExtensionIcon(activeInfo.tabId, activeInfo.windowId);
+        }
 
         // Send message to popup process to trigger the same update
         // See _initializeRunner for receiving end.
@@ -306,20 +336,15 @@ export class QuaranTab {
             const messageListener = async (message: Message) => {
                 // from background to notify tab activated. See onTabActivated for sending end.
                 if (message.type === 'ON_TAB_ACTIVATED') {
-                    await this._activeTabChanged(message.tabId, message.windowId);
+                    // External on status changed callback
+                    this._onStatusChanged?.(message.tabId);
+                }
+                if (message.type === 'ON_TAB_UPDATED') {
+                    // External on status changed callback
+                    this._onStatusChanged?.(message.tabId);
                 }
             }
             this._browser.runtime.onMessage.addListener(messageListener);
-        }
-    }
-
-    async _activeTabChanged(tabId: number, windowId: number): Promise<void> {
-        // External on status changed callback
-        this._onStatusChanged?.(tabId);
-
-        // Update icon to reflect current tab's quarantine status
-        if (this._runner === Runner.BACKGROUND) {
-            await this._updateExtensionIcon(tabId, windowId);
         }
     }
 

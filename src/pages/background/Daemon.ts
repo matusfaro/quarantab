@@ -49,6 +49,14 @@ export default class Daemon {
     }
   }
 
+  async onTabUpdated(tabId: number, changeInfo: browser.tabs._OnUpdatedChangeInfo, tab: browser.tabs.Tab): Promise<void> {
+    try {
+      await this._quarantab.onTabUpdated(tab);
+    } catch (e: unknown) {
+      console.error(`Error in onTabActivated listener: ${e as string}`)
+    }
+  }
+
   async onTabActivated(activeInfo: browser.tabs._OnActivatedActiveInfo): Promise<void> {
     try {
       await this._quarantab.onTabActivated(activeInfo);
@@ -75,6 +83,7 @@ export default class Daemon {
     this._browser.tabs?.onRemoved.addListener(this.onTabRemoved.bind(this))
 
     // Listen for tab activated to change extension icon to match current state
+    this._browser.tabs?.onUpdated.addListener(this.onTabUpdated.bind(this))
     this._browser.tabs?.onActivated.addListener(this.onTabActivated.bind(this))
 
     console.log(`Listening for network requests and tab events`);

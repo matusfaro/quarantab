@@ -314,8 +314,6 @@ async function DevVersionedExt(versions: (2 | 3)[]) {
 
   let version = versions[0];
 
-  console.clear();
-
   Clean();
   try {
     await BuildVersionedExt(versions, true);

@@ -4,9 +4,9 @@ import { ClosedColorRgb, NoneColorRgb, OpenColorRgb, QuarantineStatus, Runner, g
 import LogoRed from '@assets/img/logo-red.svg';
 import LogoGreen from '@assets/img/logo-green.svg';
 import LogoGrey from '@assets/img/logo-grey.svg';
-import { Alert, Box, Checkbox, Collapse, FormControlLabel, Step, StepLabel, Stepper, ThemeProvider, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Checkbox, Collapse, FormControlLabel, Stack, Step, StepLabel, Stepper, SvgIcon, ThemeProvider, Tooltip, Typography } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
-import { Info } from "@mui/icons-material";
+import InfoOutlined from "./InfoOutlined";
 
 export default function Popup(): JSX.Element {
 
@@ -51,11 +51,11 @@ export default function Popup(): JSX.Element {
       || !tab.cookieStoreId) {
       return undefined;
     }
+    if (!tab.url?.match(/^https?:\/\//)) {
+      return undefined;
+    }
     if (tab.pinned) {
       return 'Cannot quarantine pinned tabs';
-    }
-    if (!tab.url?.match(/^https?:\/\//)) {
-      return 'Unsupported URL scheme';
     }
     return true;
   }
@@ -65,6 +65,7 @@ export default function Popup(): JSX.Element {
   var showLockAfterLoad = false;
   var bigButtonAction;
   var bigButtonTitle;
+  var bigButtonTooltip;
   var bigButtonColor: 'success' | 'error' | 'info' = 'info';
   var color: string = NoneColorRgb;
   if (eligibility !== true) {
@@ -76,6 +77,7 @@ export default function Popup(): JSX.Element {
   else if (status === QuarantineStatus.NONE && currentTab) {
     showLockAfterLoad = true;
     bigButtonTitle = 'Quarantine';
+    bigButtonTooltip = 'Re-open this page in a fresh new temporary container isolated from all other tabs.';
     bigButtonAction = async () => {
       try {
         setLoading(true);
@@ -95,6 +97,7 @@ export default function Popup(): JSX.Element {
   // Show button to lock tabs
   else if (status === QuarantineStatus.OPEN && currentTab) {
     bigButtonTitle = 'Lock';
+    bigButtonTooltip = 'Cut-off internet access to this container so you can safely input sensitive information';
     bigButtonColor = 'error';
     Logo = LogoRed;
     color = OpenColorRgb;
@@ -112,6 +115,7 @@ export default function Popup(): JSX.Element {
   // Show button to purge site and container
   else if (status === QuarantineStatus.CLOSED && currentTab) {
     bigButtonTitle = 'Purge';
+    bigButtonTooltip = 'Delete this container and all data associated with it.';
     color = ClosedColorRgb;
     bigButtonColor = 'success';
     Logo = LogoGreen;
@@ -146,20 +150,31 @@ export default function Popup(): JSX.Element {
         </Box>
 
         <Box textAlign='center' sx={{ m: 2, marginBottom: 0 }} >
-            <LoadingButton
-              variant='contained'
-              size='large'
-              color={bigButtonColor}
-              disabled={!bigButtonAction || loading}
-              onClick={bigButtonAction}
-              loading={loading}
-              sx={{ m: 1, minWidth: 150 }}
-            >
+          <LoadingButton
+            variant='contained'
+            size='large'
+            color={bigButtonColor}
+            disabled={!bigButtonAction || loading}
+            onClick={bigButtonAction}
+            loading={loading}
+            sx={{ m: 1, minWidth: 160 }}
+          >
+            <Stack direction='row' alignItems='center' gap={0.5}>
               {bigButtonTitle}
+              {!!bigButtonTooltip && (
+                <Tooltip disableInteractive arrow title={(<Typography>
+                  {bigButtonTooltip}
+                </Typography>)}>
+                  <Box display='flex' alignItems='center' justifyContent='center'>
+                    <InfoOutlined fontSize='small' />
+                  </Box>
+                </Tooltip>
+              )}
+            </Stack>
           </LoadingButton>
           <br />
           <Collapse in={showLockAfterLoad} appear>
-            <Box display='flex' justifyContent='center'>
+            <Box display='flex' justifyContent='center' alignItems='center'>
               <FormControlLabel
                 control={(
                   <Checkbox
@@ -169,11 +184,6 @@ export default function Popup(): JSX.Element {
                 )}
                 label='Auto-lock'
               />
-              <Tooltip disableInteractive arrow title={(<Typography>
-                Lock after page fully loads.
-              </Typography>)}>
-                <Info fontSize='small' />
-              </Tooltip>
             </Box>
           </Collapse>
         </Box>

@@ -4,7 +4,7 @@ import { ClosedColorRgb, NoneColorRgb, OpenColorRgb, QuarantineStatus, Runner, g
 import LogoRed from '@assets/img/logo-red.svg';
 import LogoGreen from '@assets/img/logo-green.svg';
 import LogoGrey from '@assets/img/logo-grey.svg';
-import { Alert, Box, Checkbox, Collapse, FormControlLabel, Stack, Step, StepLabel, Stepper, SvgIcon, ThemeProvider, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Checkbox, Collapse, FormControlLabel, Stack, Step, StepLabel, Stepper, ThemeProvider, Tooltip, Typography } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import InfoOutlined from "./InfoOutlined";
 

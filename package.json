@@ -1,12 +1,12 @@
 {
-  "name": "browser-extension",
-  "displayName": "Browser Extension",
-  "version": "2.0.0",
-  "description": "Browser Extension Boilerplate",
+  "name": "quarantab",
+  "displayName": "QuaranTab",
+  "version": "0.0.1",
+  "description": "Safely use sensitive data with online tools",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/debdut/browser-extension.git"
+    "url": "https://github.com/matusfaro/quarantab.git"
   },
   "scripts": {
     "start": "ts-node-esm scripts/build.ts --dev",
@@ -30,6 +30,7 @@
     "@babel/preset-typescript": "^7.22.15",
     "@esbuilder/html": "^0.0.6",
     "@jest/globals": "^29.6.4",
+    "@types/archiver": "^5.3.2",
     "@types/chrome": "^0.0.209",
     "@types/fs-extra": "^11.0.1",
     "@types/node": "^18.11.18",
@@ -37,6 +38,7 @@
     "@types/react-dom": "^18.0.10",
     "@typescript-eslint/eslint-plugin": "^5.48.2",
     "@typescript-eslint/parser": "^5.48.2",
+    "archiver": "^6.0.1",
     "autoprefixer": "^10.4.13",
     "babel-jest": "^29.6.4",
     "concurrently": "^7.6.0",

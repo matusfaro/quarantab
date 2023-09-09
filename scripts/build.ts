@@ -10,6 +10,7 @@ import concurrently from "concurrently";
 import { GetInstalledBrowsers, BrowserPath } from "get-installed-browsers";
 import stylePlugin from "esbuild-style-plugin";
 import watch from "node-watch";
+import archiver from 'archiver';
 
 import { getManifest } from "../src/manifest/index.mjs";
 
@@ -498,10 +499,29 @@ function BuildBrowserExt(browsers: string[]) {
   for (const matchedBrowser of matchedBrowsers) {
     const version = manifestVersion(matchedBrowser);
     const inputDir = resolve(OutDir, `v${version}`);
-    const outDir = resolve(OutDir, toKebabCase(matchedBrowser.name));
+    const kebab = toKebabCase(matchedBrowser.name);
+    const outDir = resolve(OutDir, kebab);
 
     fse.copySync(inputDir, outDir);
+
+    zipDirectory(outDir, resolve(OutDir, kebab + '.xpi'))
   }
+}
+
+function zipDirectory(sourceDir: string, outPath: string) {
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  const stream = fs.createWriteStream(outPath);
+
+  return new Promise((resolve, reject) => {
+    archive
+      .directory(sourceDir, false)
+      .on('error', err => reject(err))
+      .pipe(stream)
+      ;
+
+    stream.on('close', () => resolve(undefined));
+    archive.finalize();
+  });
 }
 
 function CreateProfileRoot() {

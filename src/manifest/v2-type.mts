@@ -169,4 +169,9 @@ export interface ManifestTypeV2 {
   update_url?: string | undefined;
   version_name?: string | undefined;
   web_accessible_resources?: string[] | undefined;
+  browser_specific_settings?: {
+    gecko?: {
+      strict_min_version?: string
+    }
+  },
 }

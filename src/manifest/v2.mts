@@ -20,6 +20,11 @@ const manifest: ManifestTypeV2 = {
     "contextualIdentities",
     "<all_urls>",
   ],
+  browser_specific_settings: {
+    gecko: {
+      strict_min_version: "91.1.0"
+    }
+  },
 };
 
 function getManifestV2(pageDirMap: { [x: string]: any }): ManifestTypeV2 {

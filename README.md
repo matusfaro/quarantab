@@ -29,7 +29,7 @@ I would recommend to review the code, build the extension yourself and install i
 
 If you simply install the extension from the Firefox Add-ons store, you are implicitly trusting me that the extension does what it says it does.
 
-You were warned: [Placeholder link to store]
+You were warned: [Get it from the Firefox Add-ons store](https://addons.mozilla.org/firefox/addon/quarantab/)
 
 ## How to use
 

@@ -184,7 +184,7 @@ export default function Popup(): JSX.Element {
             <TooltipIcon title="Opening a website in a container prevents it from communicating with other websites in your browser." />
           </Grid>
           <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
-            {status === QuarantineStatus.NONE ? (
+            {status === undefined || status === QuarantineStatus.NONE ? (
               <Chip label='NONE' color='warning' sx={{ width: 120 }} icon={(<Groups />)} />
             ) : (
               <Chip label="ACTIVE" color="success" sx={{ width: 120 }} icon={(<SafetyDivider />)} />
@@ -195,7 +195,7 @@ export default function Popup(): JSX.Element {
             <TooltipIcon title='Network access prevents a website from communicating with the internet.' />
           </Grid>
           <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
-            {status !== QuarantineStatus.CLOSED ? (
+            {status === undefined || status !== QuarantineStatus.CLOSED ? (
               <Chip label="ONLINE" color="warning" sx={{ width: 120 }} icon={(<Wifi />)} />
             ) : (
               <Chip label="OFFLINE" color="success" sx={{ width: 120 }} icon={(<WifiOff />)} />

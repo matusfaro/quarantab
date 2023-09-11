@@ -127,7 +127,6 @@ async function buildHtmlPage(name: string, entry: string, outdir: string, dev = 
       stylePlugin({
         postcss: {
           plugins: [
-            require("postcss-import"),
             require("autoprefixer"),
           ],
         }
@@ -162,7 +161,6 @@ async function buildJSPage(name: string, entry: string, outdir: string, dev: boo
       stylePlugin({
         postcss: {
           plugins: [
-            require("postcss-import"),
             require("autoprefixer"),
           ],
         }

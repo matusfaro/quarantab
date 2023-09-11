@@ -112,15 +112,17 @@ If you find a bug, please report it to me. A bug bounty is available for this pr
 5. For an exploit that leaks any data under all circumstances, the bounty would be 100 USD.
 6. The bug exists in this extension or the design of it. It excludes explots in the browser itself, the contextualIdentities implementation or isolation guarantees.
 
-### Bug bounty remaining pool
+### Bug bounty pool
 
-100 USD
+Available: __100 USD__
 
 _the amount will grow in the future proportionally to my confidence_
 
-### Bug bounty history
+#### History
 
-No exploits yet.
+- __+100 USD__ Initial pool by @matusfaro (2023-09-10)
+- __-100 USD__ to @dz2742 for [Established WebSocket session remains open](https://github.com/matusfaro/quarantab/issues/2) (2023-09-11)
+- __+100 USD__ Replenished by @matusfaro (2023-09-11)
 
 ## Building
 

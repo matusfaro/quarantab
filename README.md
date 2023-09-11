@@ -1,8 +1,13 @@
 
 # QuarantTab
-<img src='img/popup-LOCKED.png' width=300>
+
+<a href="https://addons.mozilla.org/firefox/addon/quarantab/">
+  <img src="img/firefox-get-addon.png" alt="Download on Firefox store"></img>
+</a>
 
 Safely use sensitive data with online tools. Browser extension to cut-off network access to a website to prevent it from phoning home. This allows you to input sensitive data into a website without worrying about it being stolen.
+
+<img src='img/popup-LOCKED.png' width=300>
 
 ## Use cases
 

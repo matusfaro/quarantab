@@ -128,7 +128,6 @@ async function buildHtmlPage(name: string, entry: string, outdir: string, dev = 
         postcss: {
           plugins: [
             require("postcss-import"),
-            require("tailwindcss"),
             require("autoprefixer"),
           ],
         }
@@ -164,7 +163,6 @@ async function buildJSPage(name: string, entry: string, outdir: string, dev: boo
         postcss: {
           plugins: [
             require("postcss-import"),
-            require("tailwindcss"),
             require("autoprefixer"),
           ],
         }
@@ -570,6 +568,7 @@ function LaunchCommand(browser: BrowserPath, profileDir: string) {
     "profile-create-if-missing": null,
     "browser-console": null,
     "keep-profile-changes": null,
+    "devtools": null,
   };
 
   if (browser.type === "firefox") {

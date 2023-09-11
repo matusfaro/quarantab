@@ -1,6 +1,6 @@
 
 # QuarantTab
-<img src='img/screenshot.png' width=300>
+<img src='img/popup-LOCKED.png' width=300>
 
 Safely use sensitive data with online tools. Browser extension to cut-off network access to a website to prevent it from phoning home. This allows you to input sensitive data into a website without worrying about it being stolen.
 
@@ -33,19 +33,23 @@ You were warned: [Placeholder link to store]
 
 ## How to use
 
-### Quarantine
+There are two steps to put a website under quarantine. One is to isolate it from all other website running in your browser using a temporary Container. The second is to cut-off network access to the website.
 
-Open any website you wish to use with sensitive data. Click the extension icon to quarantine the website. This will cut-off network access to the website. The website will still be able to run JavaScript, but it will not be able to make any network requests.
+### Container isolation
 
-<img src='img/screenshot-quarantine.png' width=500>
+You may re-open your current tab or a new tab in a temporary container. This will isolate the website from all other websites running in your browser.
 
-### Lock
+<img src='img/screenshot-NONE.png' width=500>
 
-If you kept `Auto-lock` enabled, this step is only briefly shown while the page loads. When the page is completely loaded, the extension will automatically lock the website, cutting off the network access.
+### Network access
 
-<img src='img/screenshot-lock.png' width=500>
+Next step is to cut-off network access to the website. This will prevent the website from phoning home and sending your sensitive data to a malicious server.
 
-### Use
+If you are re-opening your current tab, this step is automatic once the page fully loads.
+
+<img src='img/screenshot-OPEN.png' width=500>
+
+### Using
 
 At this point, the website is completely locked down. You can now safely use the website and input sensitive data. No data will leak out of the website.
 
@@ -53,13 +57,11 @@ If a website stops working, it probably means that it depends on additional reso
 
 Some tools actually work by sending your data to a server for processing, so they will not work with this extension by design.
 
-<img src='img/screenshot-use.png' width=500>
+<img src='img/screenshot-LOCKED.png' width=500>
 
-### Purge
+### Cleaning up
 
-When you are done using the site, click the extension icon and click the purge button to delete all website data.
-
-<img src='img/screenshot-purge.png' width=500>
+When you are done using the site, simply close it and all browser data will be automatically deleted.
 
 ## How it works
 

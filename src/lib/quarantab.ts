@@ -6,8 +6,6 @@ export enum Runner {
 type Message = MessageSetQuarantineStatus | MessageOnTabActivated | MessageOnTabUpdated;
 type MessageSetQuarantineStatus = {
     type: 'SET_QUARANTINE_STATUS',
-    tabId: number,
-    windowId: number,
     cookieStoreId: string,
     status: QuarantineStatus,
 }
@@ -30,8 +28,8 @@ export enum QuarantineStatus {
 
 export const NoneColor = 'lightgrey';
 export const NoneColorRgb = '#D3D3D3';
-export const OpenColor = 'red';
-export const OpenColorRgb = '#F06F46';
+export const OpenColor = 'yellow';
+export const OpenColorRgb = '#F7CD45';
 export const ClosedColor = 'green';
 export const ClosedColorRgb = '#72C935';
 
@@ -50,7 +48,7 @@ export class QuaranTab {
      * List of Containers that are owned by this extension and their corresponding lock state.
      */
     readonly _cookieStoreIdToIsLocked: Promise<Map<string, boolean>>;
-    _onStatusChanged: ((tabId: number) => void) | undefined = undefined;
+    _onStatusChanged: (() => void) | undefined = undefined;
 
     constructor(runner: Runner, browserInstance: typeof browser) {
         this._runner = runner;
@@ -64,7 +62,7 @@ export class QuaranTab {
      * 
      * @param callback 
      */
-    setOnStatusChanged(callback: (tabId: number) => void): void {
+    setOnStatusChanged(callback: () => void): void {
         this._onStatusChanged = callback;
     }
 
@@ -91,8 +89,11 @@ export class QuaranTab {
      * @param currentTab 
      * @returns new opened tab
      */
-    async openTabInQuarantine(currentTab: browser.tabs.Tab, lockAfterLoadWithCallback?: (updatedTab: browser.tabs.Tab) => void): Promise<browser.tabs.Tab> {
-        if (!currentTab.id || !currentTab.windowId) throw new Error('Cannot access current tab');
+    async openTabInQuarantine(
+        replaceTab?: browser.tabs.Tab,
+        lockAfterLoadWithCallback?: (updatedTab: browser.tabs.Tab) => void,
+    ): Promise<browser.tabs.Tab> {
+        if (replaceTab && (!replaceTab.id || !replaceTab.windowId)) throw new Error('Cannot access tab');
 
         // Create new temporary container just for this tab
         const container = await browser.contextualIdentities.create({
@@ -101,19 +102,21 @@ export class QuaranTab {
             icon: 'fence',
         });
         if (!container.cookieStoreId) throw new Error('Failed to create container');
-        await this._setIsLocked(currentTab.id, currentTab.windowId, container.cookieStoreId, QuarantineStatus.OPEN)
+        await this._setIsLocked(container.cookieStoreId, QuarantineStatus.OPEN)
 
         // Open new tab in our new container
         const newTabPromise = this._browser.tabs.create({
-            url: currentTab.url,
+            url: replaceTab !== undefined ? replaceTab.url : undefined,
             cookieStoreId: container.cookieStoreId,
             active: true,
-            openerTabId: currentTab.id,
-            index: currentTab.index + 1,
+            openerTabId: replaceTab !== undefined ? replaceTab.id : undefined,
+            index: replaceTab !== undefined ? replaceTab.index + 1 : undefined,
         });
 
         // Close current tab
-        this._browser.tabs.remove(currentTab.id);
+        if (replaceTab?.id !== undefined) {
+            this._browser.tabs.remove(replaceTab.id);
+        }
 
         // If requested, lock the container after the tab has finished loading site
         const newTab = await newTabPromise;
@@ -132,7 +135,7 @@ export class QuaranTab {
         }
 
         // Return reference to our new tab
-        console.log(`${this._runner}: Re-opened current tab with new container id ${container.cookieStoreId}`);
+        console.log(`${this._runner}: ${replaceTab ? 'Re-opened current' : 'Opened new'} tab with new container id ${container.cookieStoreId}`);
         return newTab;
     }
 
@@ -146,7 +149,7 @@ export class QuaranTab {
         if (!currentTab.cookieStoreId || !currentTab.id || !currentTab.windowId) throw new Error('Cannot access current tab');
 
         // Set to be quarantined
-        await this._setIsLocked(currentTab.id, currentTab.windowId, currentTab.cookieStoreId, QuarantineStatus.CLOSED)
+        await this._setIsLocked(currentTab.cookieStoreId, QuarantineStatus.CLOSED)
         console.log(`${this._runner}: Cutting network access to container id ${currentTab.cookieStoreId}`);
 
         // Update container color to indicate it's quarantined
@@ -167,15 +170,8 @@ export class QuaranTab {
     async purgeQurantine(cookieStoreId?: string): Promise<void> {
         if (!cookieStoreId) return;
 
-        // Remove container
-        // This should delete all data and close all tabs within the container
-        await browser.contextualIdentities.remove(cookieStoreId);
-        console.log(`${this._runner}: Purged container with container id ${cookieStoreId}`);
-
-        // If Multi-Account Containers extension is not installed,
-        // the container will half-delete itself and leave a zombie container.
-        // The container is not reachable so all we have to do is close all
-        // the tabs using it.
+        // Since we listen for tab changes and delete containers once all tabs
+        // are closed, all we need to do is close all tabs using this container
         const tabIds = (await this._browser.tabs
             .query({ cookieStoreId }))
             .reduce<number[]>((ids, tab) => {
@@ -184,10 +180,8 @@ export class QuaranTab {
                 }
                 return ids;
             }, []);
-        if (tabIds.length > 0) {
-            console.log(`${this._runner}: Closing tabs still open with purged container id ${cookieStoreId}`);
-            await this._browser.tabs.remove(tabIds);
-        }
+        await this._browser.tabs.remove(tabIds);
+        console.log(`${this._runner}: Closed ${tabIds.length} tabs to trigger purge of container id ${cookieStoreId}`);
     }
 
     /**
@@ -248,7 +242,7 @@ export class QuaranTab {
     async onTabActivated(activeInfo: browser.tabs._OnActivatedActiveInfo): Promise<void> {
         // Update icon to reflect current tab's quarantine status
         if (this._runner === Runner.BACKGROUND) {
-            await this._updateExtensionIcon(activeInfo.tabId, activeInfo.windowId);
+            await this._updateExtensionIcon();
         }
 
         // Send message to popup process to trigger the same update
@@ -324,8 +318,8 @@ export class QuaranTab {
             const messageListener = async (message: Message) => {
                 // from popup to update quarantine status. See _setIsLocked for sending end.
                 if (message.type === 'SET_QUARANTINE_STATUS') {
-                    await this._setIsLocked(message.tabId, message.windowId, message.cookieStoreId, message.status);
-                    await this._updateExtensionIcon(message.tabId, message.windowId);
+                    await this._setIsLocked(message.cookieStoreId, message.status);
+                    await this._updateExtensionIcon();
                 }
             }
             this._browser.runtime.onMessage.addListener(messageListener);
@@ -337,11 +331,11 @@ export class QuaranTab {
                 // from background to notify tab activated. See onTabActivated for sending end.
                 if (message.type === 'ON_TAB_ACTIVATED') {
                     // External on status changed callback
-                    this._onStatusChanged?.(message.tabId);
+                    this._onStatusChanged?.();
                 }
                 if (message.type === 'ON_TAB_UPDATED') {
                     // External on status changed callback
-                    this._onStatusChanged?.(message.tabId);
+                    this._onStatusChanged?.();
                 }
             }
             this._browser.runtime.onMessage.addListener(messageListener);
@@ -351,29 +345,30 @@ export class QuaranTab {
     /**
      * Called when a tab is activated (switched) or the status of a tab changes. Only called in background process.
      */
-    async _updateExtensionIcon(tabId: number, windowId: number): Promise<void> {
-        const currentTab = await this._browser.tabs.get(tabId);
-        if (!currentTab?.cookieStoreId) return;
-
-        const status = await this.checkStatus(currentTab.cookieStoreId)
-        var iconPath = 'public/logo-grey.svg'
-        switch (status) {
-            case QuarantineStatus.OPEN:
-                iconPath = 'public/logo-red.svg'
-                break;
-            case QuarantineStatus.CLOSED:
-                iconPath = 'public/logo-green.svg'
-                break;
-            default:
-                break;
-        }
-        this._browser.browserAction.setIcon({
-            path: iconPath,
-            windowId: windowId,
-        });
+    async _updateExtensionIcon(): Promise<void> {
+        const activeTabs = await this._browser.tabs.query({ active: true });
+        await Promise.all(activeTabs.map(async (tab) => {
+            if (!tab.active || !tab.windowId) return;
+            const status = await this.checkStatus(tab.cookieStoreId)
+            var iconPath = 'public/logo-grey.svg'
+            switch (status) {
+                case QuarantineStatus.OPEN:
+                    iconPath = 'public/logo-red.svg'
+                    break;
+                case QuarantineStatus.CLOSED:
+                    iconPath = 'public/logo-green.svg'
+                    break;
+                default:
+                    break;
+            }
+            this._browser.browserAction.setIcon({
+                path: iconPath,
+                windowId: tab.windowId,
+            });
+        }));
     }
 
-    async _setIsLocked(tabId: number, windowId: number, cookieStoreId: string, status: QuarantineStatus): Promise<void> {
+    async _setIsLocked(cookieStoreId: string, status: QuarantineStatus): Promise<void> {
         switch (status) {
             case QuarantineStatus.OPEN:
                 (await this._cookieStoreIdToIsLocked).set(cookieStoreId, false);
@@ -387,15 +382,13 @@ export class QuaranTab {
         }
 
         // External on status changed callback
-        this._onStatusChanged?.(tabId);
+        this._onStatusChanged?.();
 
         // If inside popup, send message to background process to update quarantine status
         // See _initializeRunner for receiving end.
         if (this._runner === Runner.POPUP) {
             const message: MessageSetQuarantineStatus = {
                 type: 'SET_QUARANTINE_STATUS',
-                tabId,
-                windowId,
                 cookieStoreId: cookieStoreId,
                 status,
             };

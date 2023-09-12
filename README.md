@@ -9,6 +9,17 @@ Safely use sensitive data with online tools. Browser extension to cut-off networ
 
 <img src='img/popup-LOCKED.png' width=300>
 
+# Contents
+
+- [Use cases](#use-cases)
+  - [Bad use cases](#bad-use-cases)
+- [Where to get it](#where-to-get-it)
+- [How to use](#how-to-use)
+- [How it works](#how-it-works)
+- [Permissions](#permissions)
+- [Bug bounty](#bug-bounty)
+- [Building](#building)
+
 ## Use cases
 
 Do use this to convert/parse sensitive data:
@@ -18,7 +29,7 @@ Do use this to convert/parse sensitive data:
 - Hash a password for /etc/shadow
 - Parse a Protobuf message
 
-## Bad use cases
+### Bad use cases
 
 Do **not** use this extension to **generate** sensitive data:
 

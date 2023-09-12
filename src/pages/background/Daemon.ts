@@ -27,16 +27,38 @@ export default class Daemon {
     this._quarantab = quarantab
   }
 
+  /**
+   * This method is called for every new request in the entire browser.
+   * Keep it lean!
+   * 
+   * @param requestDetails 
+   * @returns 
+   */
   async onRequest(requestDetails: browser.proxy._OnRequestDetails): Promise<object> {
     try {
+      // Determine whether this request is part of our container and whether it should be blocked
       const status = await this._quarantab.checkStatus(requestDetails.cookieStoreId);
-      if (status === QuarantineStatus.CLOSED) {
-        return BLOCK;
-      } else {
-        return ALLOW;
+      switch (status) {
+        // Part of our container and container is currently allowed
+        case QuarantineStatus.OPEN:
+          // Always block websocket connections as we cannot stop in-progress
+          // connections once container blocking is started.
+          this._browser.webRequest.filterResponseData
+          if (requestDetails.type === 'websocket') {
+            return BLOCK;
+          } else {
+            return ALLOW;
+          }
+        // Part of our container and container is now blocked
+        case QuarantineStatus.CLOSED:
+          return BLOCK;
+        // Not out container, allow
+        default:
+          return ALLOW;
       }
     } catch (e: unknown) {
       console.error(`Error in onRequest listener: ${e as string}`)
+      // On error allow
       return ALLOW
     }
   }

@@ -145,7 +145,7 @@ async function buildJSPage(name: string, entry: string, outdir: string, dev: boo
 
   const out = await build({
     entryPoints: [entry],
-    bundle: false,
+    bundle: true,
     outdir: resolve(outdir, name),
     sourcemap: true,
     minify: false,

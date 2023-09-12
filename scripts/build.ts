@@ -110,8 +110,8 @@ async function buildHtmlPage(name: string, entry: string, outdir: string, dev = 
     entryPoints: [entry],
     bundle: true,
     outdir: resolve(outdir, name),
-    sourcemap: dev,
-    minify: true,
+    sourcemap: true,
+    minify: false,
     target: ["chrome58", "firefox57", "safari11", "edge18"],
     loader: {
       ".png": "dataurl",
@@ -143,12 +143,12 @@ async function buildJSPage(name: string, entry: string, outdir: string, dev: boo
   const prompt = `Building "${name}" from ${entry}:`;
   console.time(prompt);
 
-  const out =  await build({
+  const out = await build({
     entryPoints: [entry],
-    bundle: true,
+    bundle: false,
     outdir: resolve(outdir, name),
-    sourcemap: dev,
-    minify: true,
+    sourcemap: true,
+    minify: false,
     target: ["chrome58", "firefox57", "safari11", "edge18"],
     loader: {
       ".png": "dataurl",

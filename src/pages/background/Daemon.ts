@@ -43,7 +43,6 @@ export default class Daemon {
         case QuarantineStatus.OPEN:
           // Always block websocket connections as we cannot stop in-progress
           // connections once container blocking is started.
-          this._browser.webRequest.filterResponseData
           if (requestDetails.type === 'websocket') {
             return BLOCK;
           } else {

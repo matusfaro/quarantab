@@ -110,7 +110,7 @@ Potential implementation in Chromium (Would love feedback here):
 - "tabs" - Required to re-open a tab in a new container
 - "cookies" - Required for manipulating Container data
 - "contextualIdentities" - Required for creating/deleting Containers
-- "<all_urls>" - Required to use with any website
+- "<all_urls>" - Required to intercept proxy web requests for all sites
 
 ## Bug bounty
 

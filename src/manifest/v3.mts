@@ -23,6 +23,10 @@ const manifest: ManifestTypeV3 = {
     "tabs",
     "cookies",
     "contextualIdentities",
+    "privacy",
+    "webRequest",
+    "scripting",
+    "storage",
   ],
   host_permissions: [
     "<all_urls>",

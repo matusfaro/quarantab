@@ -106,10 +106,16 @@ Potential implementation in Chromium (Would love feedback here):
 
 ## Permissions
 
-- "proxy" - Required to cut-off network access to the website
+Due to the nature of this extension, it requires a lot of permissions. Ideally Firefox would allow extensions to enable offline-mode. Instead, we have to disable each possible network access individually.
+
+- "proxy" - Required to cut-off network access to the website by routing requests to a non-existent Socks proxy
 - "tabs" - Required to re-open a tab in a new container
-- "cookies" - Required for manipulating Container data
+- "cookies" - Required for manipulating Container data and clearing browser data for temporary containers
 - "contextualIdentities" - Required for creating/deleting Containers
+- "privacy" - Required for temporarily disabling WebRTC globally
+- "webRequest" - Required for monitoring active connections to determine when it's safe to use 
+- "scripting" - Required for injecting a content script for shutting down active connections
+- "storage" - Required for keeping track of WebRTC initial enable state
 - "<all_urls>" - Required to intercept proxy web requests for all sites
 
 ## Bug bounty

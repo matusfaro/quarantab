@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
-import { ClosedColorRgb, OpenColorRgb, QuarantineStatus, Runner, getQuaranTabInstance } from "@src/lib/quarantab";
+import { ClosingColorRgb, OpenColorRgb, QuarantineStatus, Runner, getQuaranTabInstance } from "@src/lib/quarantab";
+import LogoYellow from '@assets/img/logo-yellow.svg';
 import LogoRed from '@assets/img/logo-red.svg';
 import LogoGreen from '@assets/img/logo-green.svg';
 import LogoGrey from '@assets/img/logo-grey.svg';
@@ -18,10 +19,14 @@ import Refresh from "./icons/Refresh";
 import OpenInNew from "./icons/OpenInNew";
 import InfoOutlined from "./InfoOutlined";
 import Close from "./icons/Close";
+import WebSocket from "./icons/WebSocket";
+import WebRTC from "./icons/WebRTC";
+import Dns from "./icons/Dns";
 
 const theme: Theme = createTheme({
   palette: {
     warning: { main: OpenColorRgb },
+    error: { main: ClosingColorRgb },
   },
   typography: {
     fontFamily: '"Gill Sans", sans-serif',
@@ -51,23 +56,25 @@ export default function Popup(): JSX.Element {
   const [helpOpen, setHelpOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!currentTab) {
-      const refreshCurrentWindow = () => {
-        browser.tabs.query({ active: true, currentWindow: true })
-          .then((tabs) => {
-            const newCurrentTab = tabs[0];
-            if (!newCurrentTab) {
-              setErrorMsg(`Cannot detect tab`);
-            }
-            setCurrentTab(newCurrentTab);
-          }).catch(err => {
-            setErrorMsg(`${err}`);
-          });
-      }
-      refreshCurrentWindow();
-      getQuaranTabInstance(Runner.POPUP).setOnStatusChanged(() => refreshCurrentWindow());
+    const refreshCurrentWindow = () => {
+      browser.tabs.query({ active: true, currentWindow: true })
+        .then((tabs) => {
+          const newCurrentTab = tabs[0];
+          if (!newCurrentTab) {
+            setErrorMsg(`Cannot detect tab`);
+          }
+          setCurrentTab(newCurrentTab);
+        }).catch(err => {
+          setErrorMsg(`${err}`);
+        });
     }
-    else {
+    refreshCurrentWindow();
+    const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeOnStatusChanged(() => refreshCurrentWindow());
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!!currentTab) {
       getQuaranTabInstance(Runner.POPUP)
         .checkStatus(currentTab.cookieStoreId)
         .then((newStatus) => {
@@ -78,6 +85,35 @@ export default function Popup(): JSX.Element {
         });
     }
   }, [currentTab]);
+
+  const [openRequestCount, setOpenRequestCount] = useState<number>(0);
+  useEffect(() => {
+    if (!currentTab?.cookieStoreId) return;
+
+    const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeCookieStoreOpenRequestCountChanged(
+      currentTab.cookieStoreId,
+      count => setOpenRequestCount(count));
+
+    return () => {
+      unsubscribe();
+      setOpenRequestCount(0);
+    };
+  }, [currentTab?.cookieStoreId]);
+
+  const [webRtcEnabled, setWebRtcEnabled] = useState<boolean>();
+  useEffect(() => {
+    const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeWebRtcStatusChanged(
+      isEnabled => setWebRtcEnabled(isEnabled));
+    return () => unsubscribe();
+  }, []);
+
+  const [shouldBlockWebsocketOnOpen, setShouldBlockWebsocketOnOpen] = useState<boolean>();
+  useEffect(() => {
+    getQuaranTabInstance(Runner.POPUP).shouldBlockWebsocketOnOpen()
+      .then((shouldBlock) => {
+        setShouldBlockWebsocketOnOpen(shouldBlock);
+      });
+  }, []);
 
   const eligibleForQuarantine = (tab: browser.tabs.Tab | undefined): string | true | undefined => {
     if (!tab
@@ -101,13 +137,17 @@ export default function Popup(): JSX.Element {
       setReopening(reopen);
       const updatedTab = await getQuaranTabInstance(Runner.POPUP).openTabInQuarantine(
         reopen ? currentTab : undefined,
-        reopen ? (updatedUpdatedTab) => {
-          setLoading(false);
-          setCurrentTab(updatedUpdatedTab);
-        } : undefined);
+        reopen ? (updatedUpdatedTabPromise) => updatedUpdatedTabPromise
+          .then((updatedUpdatedTab) => {
+            setLoading(false);
+            setCurrentTab(updatedUpdatedTab);
+          }).catch(err => {
+            setErrorMsg(`Failed to lock: ${err}`);
+          })
+          : undefined);
         setCurrentTab(updatedTab);
     } catch (err) {
-      setErrorMsg(`${err}`);
+      setErrorMsg(`Failed to quarantine: ${err}`);
     } finally {
       setLoading(false);
     }
@@ -140,6 +180,8 @@ export default function Popup(): JSX.Element {
 
   var Logo = LogoGrey
   if (status === QuarantineStatus.OPEN) {
+    Logo = LogoYellow;
+  } else if (status === QuarantineStatus.CLOSING) {
     Logo = LogoRed;
   } else if (status === QuarantineStatus.CLOSED) {
     Logo = LogoGreen;
@@ -157,7 +199,7 @@ export default function Popup(): JSX.Element {
           {/* Logo and title */}
           <Grid xs={8} xsOffset={2} display='flex' justifyContent='center' alignItems='center'
             padding={5} paddingBottom={3}>
-            <img src={Logo} width={32} height={32} />
+            <img src={Logo} width={48} height={48} />
             <Typography variant='h5' component='h1' sx={{ marginLeft: 2 }}>
               QuaranTab
             </Typography>
@@ -179,6 +221,8 @@ export default function Popup(): JSX.Element {
 
         {/* Current state information */}
         <Grid container spacing={2}>
+
+          {/* Container isolation */}
           <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
             <Typography>Container isolation</Typography>
             <TooltipIcon title="Opening a website in a container prevents it from communicating with other websites in your browser." />
@@ -190,16 +234,83 @@ export default function Popup(): JSX.Element {
               <Chip label="ACTIVE" color="success" sx={{ width: 120 }} icon={(<SafetyDivider />)} />
             )}
           </Grid>
+
+          {/* WebRTC */}
           <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
-            <Typography>Network access</Typography>
-            <TooltipIcon title='Network access prevents a website from communicating with the internet.' />
+            <Typography>WebRTC API</Typography>
+            <TooltipIcon title='WebRTC is used for communicating with other P2P clients. While you are using a container, the WebRTC API is blocked for the entire browser. This is because a per-tab blocking is not possible from within an Addon.' />
           </Grid>
           <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
-            {status === undefined || status !== QuarantineStatus.CLOSED ? (
-              <Chip label="ONLINE" color="warning" sx={{ width: 120 }} icon={(<Wifi />)} />
-            ) : (
-              <Chip label="OFFLINE" color="success" sx={{ width: 120 }} icon={(<WifiOff />)} />
-            )}
+            <Chip
+              label={webRtcEnabled === undefined ? ("Unknown") : (!!webRtcEnabled ? ("ENABLED") : ("DISABLED"))}
+              color={(status === undefined || status === QuarantineStatus.NONE || webRtcEnabled === undefined)
+                ? 'default' : (!!webRtcEnabled
+                  ? 'warning'
+                  : 'success')}
+              icon={(<WebRTC />)}
+              sx={{ width: 120 }}
+            />
+          </Grid>
+
+          {/* Websockets */}
+          <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
+            <Typography>WebSocket API</Typography>
+            <TooltipIcon title='WebSockets are used for two-way communication over a persistent connection with a server. We intercept proxy on-request to block new connections and a content script to terminate existing connections.' />
+          </Grid>
+          <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
+            <Chip
+              label={(status === undefined || status === QuarantineStatus.NONE || (status === QuarantineStatus.OPEN && !shouldBlockWebsocketOnOpen))
+                ? 'ONLINE'
+                : 'OFFLINE'}
+              color={(status === undefined || status === QuarantineStatus.NONE)
+                ? 'default' : (((status === QuarantineStatus.OPEN && !shouldBlockWebsocketOnOpen))
+                  ? 'warning'
+                  : ('success'))}
+              icon={(<WebSocket />)}
+              sx={{ width: 120 }}
+            />
+          </Grid>
+
+          {/* HTTP traffic */}
+          <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
+            <Typography>HTTP Network access</Typography>
+            <TooltipIcon title='HTTP traffic is the primary protocol for accessing websites. We route all HTTP requests through a non-existent Socks proxy to effectively disable HTTP traffic.' />
+          </Grid>
+          <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
+            <Chip
+              label={status === QuarantineStatus.CLOSED ?
+                'OFFLINE' : (openRequestCount > 0
+                  ? `${openRequestCount} OPEN`
+                  : 'ONLINE')}
+              color={(status === undefined || status === QuarantineStatus.NONE)
+                ? 'default' : ((status === QuarantineStatus.CLOSED)
+                  ? 'success' : (status === QuarantineStatus.CLOSING
+                    ? 'error'
+                    : ('warning')))}
+              icon={(status === QuarantineStatus.CLOSED || status === QuarantineStatus.CLOSING)
+                ? (<WifiOff />)
+                : (<Wifi />)}
+              sx={{ width: 120 }}
+            />
+          </Grid>
+
+          {/* DNS traffic */}
+          <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
+            <Typography>DNS access</Typography>
+            <TooltipIcon title='DNS is used for mapping hostnames into IP addresses. We route all DNS queries through a non-existent Socks proxy to effectivelly disable DNS.' />
+          </Grid>
+          <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
+            <Chip
+              label={(status !== QuarantineStatus.CLOSED && status !== QuarantineStatus.CLOSING)
+                ? 'ONLINE'
+                : 'OFFLINE'}
+              color={(status === undefined || status === QuarantineStatus.NONE)
+                ? 'default' : ((status !== QuarantineStatus.CLOSED && status !== QuarantineStatus.CLOSING)
+                  ? 'warning'
+                  : 'success')}
+              icon={(<Dns />)}
+              sx={{ width: 120 }}
+            />
           </Grid>
         </Grid>
 
@@ -236,7 +347,7 @@ export default function Popup(): JSX.Element {
             <Grid xs={12} display='flex' alignItems='center' justifyContent='center'>
               <LoadingButton
                 startIcon={<WifiOff />}
-                disabled={loading || reopening}
+                disabled={loading || reopening || !currentTabEligible}
                 onClick={() => onClickLock()}
                 loading={loading || reopening}
                 sx={{ m: 1, minWidth: 160 }}
@@ -246,14 +357,14 @@ export default function Popup(): JSX.Element {
             </Grid>
           </Grid>
         </Collapse>
-        <Collapse in={status === QuarantineStatus.CLOSED}>
+        <Collapse in={status === QuarantineStatus.CLOSING || status === QuarantineStatus.CLOSED}>
           <Grid container margin={theme.spacing(1)} spacing={2}>
             <Grid xs={12} display='flex' alignItems='center' justifyContent='center'>
               <LoadingButton
                 startIcon={<Close />}
                 disabled={loading}
                 onClick={() => onClickClose()}
-                loading={loading}
+                loading={loading || status === QuarantineStatus.CLOSING}
                 sx={{ m: 1, minWidth: 160 }}
               >
                 Close container
@@ -267,7 +378,7 @@ export default function Popup(): JSX.Element {
         {/* Show error message if present */}
         <Collapse in={!!errorMsg}>
           <Box margin={theme.spacing(1)}>
-            <Alert color='error' sx={{ m: 2 }} >
+            <Alert severity='error' sx={{ m: 2 }} >
             <Typography>
               {errorMsg}
             </Typography>
@@ -282,7 +393,16 @@ export default function Popup(): JSX.Element {
               <Typography>
                 {reopening
                   ? 'Network will be automatically blocked once website fully loads.'
-                  : 'Once your website is fully loaded, block its network access.'}
+                  : 'Once you open your website, block its network access.'}
+              </Typography>
+            </Alert>
+          </Box>
+        </Collapse>
+        <Collapse in={status === QuarantineStatus.CLOSING}>
+          <Box margin={theme.spacing(1)}>
+            <Alert severity='error' sx={{ m: 2 }} >
+              <Typography>
+                There are still {openRequestCount} connections open. Please wait for them to finish or timeout.
               </Typography>
             </Alert>
           </Box>

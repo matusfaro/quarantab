@@ -18,6 +18,10 @@ const manifest: ManifestTypeV2 = {
     "tabs",
     "cookies",
     "contextualIdentities",
+    "privacy",
+    "webRequest",
+    "scripting",
+    "storage",
     "<all_urls>",
   ],
   browser_specific_settings: {

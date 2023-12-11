@@ -265,18 +265,31 @@ export default class Daemon {
     const webRequestOnCompletedRequestListener = this.webRequestOnCompleted.bind(this)
     const webRequestOnErrorOccurredRequestListener = this.webRequestOnErrorOccurred.bind(this)
     const startBlockingListeners = () => {
+
       // Listen for network requests to block or allow network access by setting bogus proxy settings
-      this._browser.proxy.onRequest.addListener(proxyOnRequestListener, { urls: ['<all_urls>'] })
+      this._browser.proxy.onRequest.hasListener(proxyOnRequestListener)
+        || this._browser.proxy.onRequest.addListener(proxyOnRequestListener, { urls: ['<all_urls>'] })
+
       // Listen for requests start and stop to keep a running count of all active connections (non-blocking)
-      this._browser.webRequest.onBeforeRequest.addListener(webRequestOnBeforeRequestListener, { urls: ['<all_urls>'] });
-      this._browser.webRequest.onCompleted.addListener(webRequestOnCompletedRequestListener, { urls: ['<all_urls>'] });
-      this._browser.webRequest.onErrorOccurred.addListener(webRequestOnErrorOccurredRequestListener, { urls: ['<all_urls>'] });
+      this._browser.webRequest.onBeforeRequest.hasListener(webRequestOnBeforeRequestListener)
+        || this._browser.webRequest.onBeforeRequest.addListener(webRequestOnBeforeRequestListener, { urls: ['<all_urls>'] });
+      this._browser.webRequest.onCompleted.hasListener(webRequestOnCompletedRequestListener)
+        || this._browser.webRequest.onCompleted.addListener(webRequestOnCompletedRequestListener, { urls: ['<all_urls>'] });
+      this._browser.webRequest.onErrorOccurred.hasListener(webRequestOnErrorOccurredRequestListener)
+        || this._browser.webRequest.onErrorOccurred.addListener(webRequestOnErrorOccurredRequestListener, { urls: ['<all_urls>'] });
+
     }
     const stopBlockingListeners = () => {
-      this._browser.proxy.onRequest.removeListener(proxyOnRequestListener);
-      this._browser.webRequest.onBeforeRequest.removeListener(webRequestOnBeforeRequestListener);
-      this._browser.webRequest.onCompleted.removeListener(webRequestOnCompletedRequestListener);
-      this._browser.webRequest.onErrorOccurred.removeListener(webRequestOnErrorOccurredRequestListener);
+
+      // Remove all dynamic listeners
+      this._browser.proxy.onRequest.hasListener(proxyOnRequestListener)
+        && this._browser.proxy.onRequest.removeListener(proxyOnRequestListener);
+      this._browser.webRequest.onBeforeRequest.hasListener(webRequestOnBeforeRequestListener)
+        && this._browser.webRequest.onBeforeRequest.removeListener(webRequestOnBeforeRequestListener);
+      this._browser.webRequest.onCompleted.hasListener(webRequestOnCompletedRequestListener)
+        && this._browser.webRequest.onCompleted.removeListener(webRequestOnCompletedRequestListener);
+      this._browser.webRequest.onErrorOccurred.hasListener(webRequestOnErrorOccurredRequestListener)
+        && this._browser.webRequest.onErrorOccurred.removeListener(webRequestOnErrorOccurredRequestListener);
     }
 
     return { startBlockingListeners, stopBlockingListeners }

@@ -79,7 +79,6 @@ export default function Popup(): JSX.Element {
         .checkStatus(currentTab.cookieStoreId)
         .then((newStatus) => {
           setStatus(newStatus);
-          setLoading(false);
         }).catch(err => {
           setErrorMsg(`${err}`);
         });
@@ -88,17 +87,22 @@ export default function Popup(): JSX.Element {
 
   const [openRequestCount, setOpenRequestCount] = useState<number>(0);
   useEffect(() => {
-    if (!currentTab?.cookieStoreId) return;
+    if (status === undefined || !currentTab?.cookieStoreId) {
+      return; // still loading
+    }
 
+    // Subscribe ot open request counting
     const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeCookieStoreOpenRequestCountChanged(
       currentTab.cookieStoreId,
       count => setOpenRequestCount(count));
+    setOpenRequestCount(getQuaranTabInstance(Runner.POPUP).getCookieStoreOpenRequestCount(currentTab.cookieStoreId))
+    setLoading(false);
 
     return () => {
       unsubscribe();
       setOpenRequestCount(0);
     };
-  }, [currentTab?.cookieStoreId]);
+  }, [currentTab?.cookieStoreId, status === undefined]);
 
   const [webRtcEnabled, setWebRtcEnabled] = useState<boolean>();
   useEffect(() => {
@@ -228,11 +232,13 @@ export default function Popup(): JSX.Element {
             <TooltipIcon title="Opening a website in a container prevents it from communicating with other websites in your browser." />
           </Grid>
           <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
-            {status === undefined || status === QuarantineStatus.NONE ? (
+            {loading ? (
+              <Chip label='NONE' color='default' sx={{ width: 120 }} icon={(<Groups />)} />
+            ) : (status === undefined || status === QuarantineStatus.NONE ? (
               <Chip label='NONE' color='warning' sx={{ width: 120 }} icon={(<Groups />)} />
             ) : (
               <Chip label="ACTIVE" color="success" sx={{ width: 120 }} icon={(<SafetyDivider />)} />
-            )}
+            ))}
           </Grid>
 
           {/* WebRTC */}

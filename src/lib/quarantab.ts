@@ -186,10 +186,10 @@ export class QuaranTab {
         }
 
         // If requested, lock the container after the tab has finished loading site
-        const newTab = await newTabPromise;
         if (!!lockAfterLoadWithCallback) {
             // Listen for tab updates
             const onUpdatedListener = async (tabId: number, changeInfo: browser.tabs._OnUpdatedChangeInfo, tab: browser.tabs.Tab) => {
+                const newTab = await newTabPromise;
                 // If site within the tab has completed loading, lock the container
                 if (changeInfo.status === 'complete' && tabId === newTab.id) {
                     this._browser.tabs.onUpdated.removeListener(onUpdatedListener);
@@ -207,7 +207,7 @@ export class QuaranTab {
 
         // Return reference to our new tab
         console.log(`${this._runner}: ${replaceTab ? 'Re-opened current' : 'Opened new'} tab with new container id ${container.cookieStoreId}`);
-        return newTab;
+        return await newTabPromise;
     }
 
     /**

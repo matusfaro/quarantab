@@ -1,7 +1,7 @@
 {
   "name": "quarantab",
   "displayName": "QuaranTab",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Safely use sensitive data with online tools",
   "license": "MIT",
   "repository": {

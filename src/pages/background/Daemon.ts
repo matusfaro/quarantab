@@ -1,9 +1,15 @@
 import { QuaranTab, QuarantineStatus, Runner, getQuaranTabInstance } from '@src/lib/quarantab'
+import { close } from 'fs-extra'
 
-export const ALLOW = {
+const WebRequestAllow: browser.webRequest.BlockingResponse = {}
+const WebRequestBlock: browser.webRequest.BlockingResponse = {
+  cancel: true,
+}
+
+const ProxyRequestAllow = {
   type: 'direct',
 }
-export const BLOCK = {
+const ProxyRequestBlock = {
   // SocksV5 has an explicit setting to change whether to proxy DNS.
   // or not regardless of the `proxyDNS` setting we provide here.
   // This explicit setting in Firefox settings is set to NOT proxy
@@ -22,6 +28,7 @@ export default class Daemon {
   readonly _browser: typeof browser;
   readonly _quarantab: QuaranTab;
   readonly _cookieStoreIdToOpenRequestIds = new Map<string, Set<string>>();
+  readonly _cookieStoreIdToClosedRequestIds = new Map<string, Set<string>>();
 
   constructor(browserInstance: typeof browser) {
     this._browser = browserInstance;
@@ -31,22 +38,84 @@ export default class Daemon {
   }
 
   webRequestOnBeforeRequest(requestDetails: browser.webRequest._OnBeforeRequestDetails): void {
-    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, 'open');
+    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'open');
+  }
+
+  // Currently we utilize browser.proxy.onRequest to block requests so we don't need to block
+  // using browser.webRequest.onBeforeRequest. This method is unused, but is left here as a reference
+  // in case we end up wanting to block. To make this work:
+  // - Add "webRequestBlocking" permission to the manifest
+  // - In onBeforeRequest.addListener, add ['blocking'] as a second parameter
+  // - In onBeforeRequest.addListener, use this method instead of webRequestOnBeforeRequest
+  async webRequestOnBeforeRequestBlocking(requestDetails: browser.webRequest._OnBeforeRequestDetails): Promise<browser.webRequest.BlockingResponse> {
+    try {
+      // Determine whether this request is part of our container and whether it should be blocked
+      const status = await this._quarantab.checkStatus(requestDetails.cookieStoreId);
+      switch (status) {
+        // Part of our container and container is currently open
+        case QuarantineStatus.OPEN:
+          if (requestDetails.type === 'websocket') {
+            // Special handling for websockets, see method for details
+            return (await this._quarantab.shouldBlockWebsocketOnOpen()) ? WebRequestBlock : WebRequestAllow;
+          }
+          break;
+        // Part of our container and container is now blocked
+        case QuarantineStatus.CLOSED:
+        case QuarantineStatus.CLOSING:
+          return WebRequestBlock;
+        // Not out container, allow
+        default:
+          break;
+      }
+
+      // Track connection as open and allow it 
+      this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'open');
+      return WebRequestAllow;
+
+    } catch (e: unknown) {
+      console.error(`Error in onBeforeRequest listener: ${e as string}`)
+      // On error allow
+      return WebRequestAllow
+    }
   }
 
   webRequestOnCompleted(requestDetails: browser.webRequest._OnCompletedDetails): void {
-    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, 'completed');
+    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'completed');
   }
 
   webRequestOnErrorOccurred(requestDetails: browser.webRequest._OnErrorOccurredDetails): void {
-    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, 'error');
+    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'error');
   }
 
-  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestState: 'open' | 'completed' | 'error'): Promise<void> {
+  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestType: browser.webRequest.ResourceType, requestState: 'open' | 'completed' | 'error'): Promise<void> {
     try {
       // If cookiestoreid is empty, not part of our container
       if (!cookieStoreId) {
         return;
+      }
+
+      // Decide whether we want to track this request type.
+      // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/webRequest/ResourceType
+      switch (requestType) {
+        // In Firefox, when a shim is made for a particular tracker, the connection is seen as open, but
+        // it will never complete or error out. It is unfortunate we can't determine whether the connection
+        // is still open, or was shimmed by Firefox.
+        //
+        // Bug in Firefox: https://bugzilla.mozilla.org/show_bug.cgi?id=1869194
+        //
+        // We need to track connections that can send data back to a malicious server. The following request types
+        // can only send data at the initial connection so it is safe to use.
+        // Other requests that are long-lived such websocket and server-sent events are ones we need
+        // to continue tracking.
+        case 'script':
+        case 'stylesheet':
+        case 'ping':
+        case 'font':
+        case 'imageset':
+        case 'image':
+          return; // Don't track
+        default:
+          break; // Track
       }
 
       // Determine the container status where this request is being made
@@ -57,20 +126,36 @@ export default class Daemon {
         return;
       }
 
-      // Track this connection for this container session
-      var openRequestIds = this._cookieStoreIdToOpenRequestIds.get(cookieStoreId);
-      if (!openRequestIds) {
-        // Connection closing and we have no record of it being open, ignore
-        if (requestState !== 'open') {
-          return;
+      // Check if this connection already closed
+      var closedRequestIds = this._cookieStoreIdToClosedRequestIds.get(cookieStoreId);
+      if (closedRequestIds?.has(requestId)) {
+        closedRequestIds.delete(requestId);
+        if (closedRequestIds.size === 0) {
+          this._cookieStoreIdToClosedRequestIds.delete(cookieStoreId);
         }
+        return;
+      }
 
-        // Initialize set of open connections for this container session
+      // If this connection is closing, but we have no record of it, keep track that it is closed
+      // This happens when the listener events are out of order
+      var openRequestIds = this._cookieStoreIdToOpenRequestIds.get(cookieStoreId);
+      if (requestState !== 'open' && (!openRequestIds || !openRequestIds?.has(requestId))) {
+        if (!closedRequestIds) {
+          closedRequestIds = new Set<string>();
+          this._cookieStoreIdToClosedRequestIds.set(cookieStoreId, closedRequestIds);
+        }
+        closedRequestIds.add(requestId);
+        return;
+      }
+
+      // Initialize set of open connections for this container session
+      if (!openRequestIds) {
         openRequestIds = new Set<string>();
         this._cookieStoreIdToOpenRequestIds.set(cookieStoreId, openRequestIds);
       }
 
       // Change state of request to open or close
+      console.log(`daemon: Connection ${requestState}, requestId ${requestId}, awaiting ${openRequestIds.size} openRequestIds ${[...openRequestIds]}`);
       if (requestState === 'open') {
         openRequestIds.add(requestId);
       } else {
@@ -105,7 +190,7 @@ export default class Daemon {
    * @param requestDetails 
    * @returns 
    */
-  async onRequest(requestDetails: browser.proxy._OnRequestDetails): Promise<object> {
+  async onProxyRequest(requestDetails: browser.proxy._OnRequestDetails): Promise<object> {
     try {
       // Determine whether this request is part of our container and whether it should be blocked
       const status = await this._quarantab.checkStatus(requestDetails.cookieStoreId);
@@ -114,21 +199,21 @@ export default class Daemon {
         case QuarantineStatus.OPEN:
           if (requestDetails.type === 'websocket') {
             // Special handling for websockets, see method for details
-            return (await this._quarantab.shouldBlockWebsocketOnOpen()) ? BLOCK : ALLOW;
+            return (await this._quarantab.shouldBlockWebsocketOnOpen()) ? ProxyRequestBlock : ProxyRequestAllow;
           }
-          return ALLOW;
+          return ProxyRequestAllow;
         // Part of our container and container is now blocked
         case QuarantineStatus.CLOSED:
         case QuarantineStatus.CLOSING:
-          return BLOCK;
+          return ProxyRequestBlock;
         // Not out container, allow
         default:
-          return ALLOW;
+          return ProxyRequestAllow;
       }
     } catch (e: unknown) {
       console.error(`Error in onRequest listener: ${e as string}`)
       // On error allow
-      return ALLOW
+      return ProxyRequestAllow
     }
   }
 
@@ -176,7 +261,7 @@ export default class Daemon {
 
     // Methods to start/stop listeners for the purposes of blocking network access
     // This is to avoid listening when the extension is not in use, when no containers are open
-    const proxyOnRequestListener = this.onRequest.bind(this)
+    const proxyOnRequestListener = this.onProxyRequest.bind(this)
     const webRequestOnBeforeRequestListener = this.webRequestOnBeforeRequest.bind(this)
     const webRequestOnCompletedRequestListener = this.webRequestOnCompleted.bind(this)
     const webRequestOnErrorOccurredRequestListener = this.webRequestOnErrorOccurred.bind(this)
@@ -189,7 +274,7 @@ export default class Daemon {
       this._browser.webRequest.onErrorOccurred.addListener(webRequestOnErrorOccurredRequestListener, { urls: ['<all_urls>'] });
     }
     const stopBlockingListeners = () => {
-      this._browser.proxy?.onRequest.removeListener(proxyOnRequestListener);
+      this._browser.proxy.onRequest.removeListener(proxyOnRequestListener);
       this._browser.webRequest.onBeforeRequest.removeListener(webRequestOnBeforeRequestListener);
       this._browser.webRequest.onCompleted.removeListener(webRequestOnCompletedRequestListener);
       this._browser.webRequest.onErrorOccurred.removeListener(webRequestOnErrorOccurredRequestListener);

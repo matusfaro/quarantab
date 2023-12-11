@@ -1,0 +1,89 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Network access blocked</title>
+    <style type="text/css">
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Helvetica Neue", Helvetica, sans-serif;
+            font-size: 13px;
+            background-image: url(plug.svg);
+            background-position: right bottom;
+            background-repeat: no-repeat;
+            background-size: 128px;
+            background-color: #f9f9fa;
+        }
+
+        [header] {
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-weight: normal;
+            font-size: 250%;
+            margin: 0;
+        }
+
+        body>div {
+            max-width: 470px;
+            line-height: 22px;
+        }
+
+        [hbox] {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        [vbox] {
+            display: flex;
+            flex-direction: column;
+        }
+
+        [pack=center] {
+            justify-content: center;
+        }
+
+        [pack=end] {
+            justify-content: flex-end;
+        }
+
+        [align=center] {
+            align-items: center;
+        }
+
+        [align=start] {
+            align-items: flex-start;
+        }
+
+        [align=end] {
+            align-items: flex-end;
+        }
+
+        img {
+            margin-right: 25px;
+        }
+    </style>
+</head>
+
+<body vbox pack="center" align="center">
+    <div>
+        <div vbox align="start">
+            <div hbox align="center" header>
+                <img alt="Logo" src="logo-green.svg" width="48" height="48" />
+                <h2>Network access blocked</h2>
+            </div>
+            <span>This container is managed by the QuaranTab extension. It is currently quarantined to ensure no
+                sensitive data leaves this container. Open the extension to learn more.</span>
+        </div>
+    </div>
+</body>
+
+</html>

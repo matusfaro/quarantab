@@ -49,6 +49,11 @@ export const ClosedText = ' - Locked';
 
 const WebRtcDisabledFlag = 'webrtc-disabled';
 
+export enum BrowserType {
+    FIREFOX,
+    OTHER,
+}
+
 export class QuaranTab {
     readonly _browserInfo = browser.runtime.getBrowserInfo();
     readonly _startupListeners?: () => void;
@@ -128,6 +133,18 @@ export class QuaranTab {
     }
 
     /**
+     * Check for browser type.
+     */
+    async getBrowserType(): Promise<BrowserType> {
+        const browserInfo = (await this._browserInfo);
+        if (browserInfo.name === 'Firefox' && browserInfo.vendor === 'Mozilla') {
+            return BrowserType.FIREFOX;
+        } else {
+            return BrowserType.OTHER;
+        }
+    }
+
+    /**
      * Special case whether to block WebSocket connections on open status.
      * 
      * In Firefox, we can terminate open WebSocket connections using window.stop()
@@ -135,12 +152,7 @@ export class QuaranTab {
      * connections from starting even before network lock is requested
      */
     async shouldBlockWebsocketOnOpen(): Promise<boolean> {
-        const browserInfo = (await this._browserInfo);
-        if (browserInfo.name === 'Firefox' && browserInfo.vendor === 'Mozilla') {
-            return false;
-        } else {
-            return true;
-        }
+        return (await this.getBrowserType()) !== BrowserType.FIREFOX;
     }
 
     /**

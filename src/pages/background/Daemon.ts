@@ -1,4 +1,4 @@
-import { QuaranTab, QuarantineStatus, Runner, getQuaranTabInstance } from '@src/lib/quarantab'
+import { BrowserType, QuaranTab, QuarantineStatus, Runner, getQuaranTabInstance } from '@src/lib/quarantab'
 import { close } from 'fs-extra'
 
 const WebRequestAllow: browser.webRequest.BlockingResponse = {}
@@ -37,16 +37,10 @@ export default class Daemon {
     this.runListeners();
   }
 
-  webRequestOnBeforeRequest(requestDetails: browser.webRequest._OnBeforeRequestDetails): void {
-    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'open');
-  }
-
-  // Currently we utilize browser.proxy.onRequest to block requests so we don't need to block
-  // using browser.webRequest.onBeforeRequest. This method is unused, but is left here as a reference
-  // in case we end up wanting to block. To make this work:
-  // - Add "webRequestBlocking" permission to the manifest
-  // - In onBeforeRequest.addListener, add ['blocking'] as a second parameter
-  // - In onBeforeRequest.addListener, use this method instead of webRequestOnBeforeRequest
+  // Currently we utilize browser.proxy.onRequest to redirect requests to a non-existent proxy which works
+  // well for both requests and also DNS lookups. However, we also block requests here as well since we can.
+  // The main purpose why we are using a block onBeforeRequest is to redirect new page loads and tabs to a
+  // custom page explaining that this container has network access blocked.
   async webRequestOnBeforeRequestBlocking(requestDetails: browser.webRequest._OnBeforeRequestDetails): Promise<browser.webRequest.BlockingResponse> {
     try {
       // Determine whether this request is part of our container and whether it should be blocked
@@ -62,8 +56,22 @@ export default class Daemon {
         // Part of our container and container is now blocked
         case QuarantineStatus.CLOSED:
         case QuarantineStatus.CLOSING:
+          // Redirect if this is a new page load or new tab opened
+          // This is to replace a network error page with a custom page
+          if (requestDetails.type === 'main_frame' && requestDetails.url.startsWith('http')) {
+            const redirectUrl = this._browser.runtime.getURL(
+              `/public/network-access-blocked.html?tabId=${requestDetails.tabId}&url=${encodeURIComponent(requestDetails.url)}`
+            );
+            if ((await this._quarantab.getBrowserType()) === BrowserType.FIREFOX) {
+              window.setTimeout(() => this._browser.tabs.update({
+                url: redirectUrl
+              }), 10);
+            }
+            return { redirectUrl };
+          }
+          // Block request
           return WebRequestBlock;
-        // Not out container, allow
+        // Not our container, allow
         default:
           break;
       }
@@ -265,7 +273,7 @@ export default class Daemon {
     // Methods to start/stop listeners for the purposes of blocking network access
     // This is to avoid listening when the extension is not in use, when no containers are open
     const proxyOnRequestListener = this.onProxyRequest.bind(this)
-    const webRequestOnBeforeRequestListener = this.webRequestOnBeforeRequest.bind(this)
+    const webRequestOnBeforeRequestListener = this.webRequestOnBeforeRequestBlocking.bind(this)
     const webRequestOnCompletedRequestListener = this.webRequestOnCompleted.bind(this)
     const webRequestOnErrorOccurredRequestListener = this.webRequestOnErrorOccurred.bind(this)
     const startBlockingListeners = () => {
@@ -276,7 +284,7 @@ export default class Daemon {
 
       // Listen for requests start and stop to keep a running count of all active connections (non-blocking)
       this._browser.webRequest.onBeforeRequest.hasListener(webRequestOnBeforeRequestListener)
-        || this._browser.webRequest.onBeforeRequest.addListener(webRequestOnBeforeRequestListener, { urls: ['<all_urls>'] });
+        || this._browser.webRequest.onBeforeRequest.addListener(webRequestOnBeforeRequestListener, { urls: ['<all_urls>'] }, ['blocking']);
       this._browser.webRequest.onCompleted.hasListener(webRequestOnCompletedRequestListener)
         || this._browser.webRequest.onCompleted.addListener(webRequestOnCompletedRequestListener, { urls: ['<all_urls>'] });
       this._browser.webRequest.onErrorOccurred.hasListener(webRequestOnErrorOccurredRequestListener)

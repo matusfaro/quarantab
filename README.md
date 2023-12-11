@@ -114,6 +114,7 @@ Due to the nature of this extension, it requires a lot of permissions. Ideally F
 - "contextualIdentities" - Required for creating/deleting Containers
 - "privacy" - Required for temporarily disabling WebRTC globally
 - "webRequest" - Required for monitoring active connections to determine when it's safe to use 
+- "webRequestBlocking" - Required for blocking active connections and to redirect blocked page loads to an informational page
 - "scripting" - Required for injecting a content script for shutting down active connections
 - "storage" - Required for keeping track of WebRTC initial enable state
 - "<all_urls>" - Required to intercept proxy web requests for all sites

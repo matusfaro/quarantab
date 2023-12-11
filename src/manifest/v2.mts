@@ -20,6 +20,7 @@ const manifest: ManifestTypeV2 = {
     "contextualIdentities",
     "privacy",
     "webRequest",
+    "webRequestBlocking",
     "scripting",
     "storage",
     "<all_urls>",

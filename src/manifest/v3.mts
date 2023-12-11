@@ -25,6 +25,7 @@ const manifest: ManifestTypeV3 = {
     "contextualIdentities",
     "privacy",
     "webRequest",
+    "webRequestBlocking",
     "scripting",
     "storage",
   ],

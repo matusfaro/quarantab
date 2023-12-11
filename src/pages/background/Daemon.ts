@@ -87,7 +87,7 @@ export default class Daemon {
     this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'error');
   }
 
-  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestType: browser.webRequest.ResourceType, requestState: 'open' | 'completed' | 'error'): Promise<void> {
+  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestType: browser.webRequest.ResourceType, requestState: 'open' | 'completed' | 'error' | 'block'): Promise<void> {
     try {
       // If cookiestoreid is empty, not part of our container
       if (!cookieStoreId) {
@@ -198,12 +198,16 @@ export default class Daemon {
         case QuarantineStatus.OPEN:
           if (requestDetails.type === 'websocket') {
             // Special handling for websockets, see method for details
-            return (await this._quarantab.shouldBlockWebsocketOnOpen()) ? ProxyRequestBlock : ProxyRequestAllow;
+            if (await this._quarantab.shouldBlockWebsocketOnOpen()) {
+              this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'block');
+              return ProxyRequestBlock;
+            }
           }
           return ProxyRequestAllow;
         // Part of our container and container is now blocked
         case QuarantineStatus.CLOSED:
         case QuarantineStatus.CLOSING:
+          this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'block');
           return ProxyRequestBlock;
         // Not out container, allow
         default:

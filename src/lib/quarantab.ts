@@ -67,8 +67,7 @@ export class QuaranTab {
     readonly _cookieStoreIdToTabIds: Map<string, Set<number>> = new Map();
     readonly _cookieStoreIdOpenRequestCount: Map<string, number> = new Map();
     readonly _cookieStoreIdToOpenRequestCountChangedListener: Map<string, (openRequestCount: number) => void> = new Map();
-    /**                    containerColor = OpenColor;
-
+    /**
      * List of Containers that are owned by this extension and their corresponding lock state.
      */
     readonly _cookieStoreIdToIsLocked: Promise<Map<string, boolean>>;
@@ -235,9 +234,14 @@ export class QuaranTab {
         const openRequestCount = this.getCookieStoreOpenRequestCount(currentTab.cookieStoreId);
 
         // Set to be quarantined
+        console.log(`${this._runner}: Cutting network access to container id ${currentTab.cookieStoreId}`);
         await this._setIsLocked(currentTab.cookieStoreId,
             openRequestCount > 0 ? QuarantineStatus.CLOSING : QuarantineStatus.CLOSED)
-        console.log(`${this._runner}: Cutting network access to container id ${currentTab.cookieStoreId}`);
+
+        // Check for race condition where all requests may have closed while we awaited setting lock status
+        if (openRequestCount > 0 && this.getCookieStoreOpenRequestCount(currentTab.cookieStoreId) === 0) {
+            await this._setIsLocked(currentTab.cookieStoreId, QuarantineStatus.CLOSED)
+        }
 
         return this._browser.tabs.get(currentTab.id);
     }
@@ -403,9 +407,10 @@ export class QuaranTab {
         // If these criteria are met, notify subscribers of new status change
         // mainly to trigger color change of container and icon
         if (this._runner === Runner.POPUP) {
+            const status = await this.checkStatus(cookieStoreId)
             if (count === 0
                 && !!this._cookieStoreIdOpenRequestCount.get(cookieStoreId)
-                && (await this._cookieStoreIdToIsLocked).get(cookieStoreId) === true) {
+                && (status === QuarantineStatus.CLOSING || status === QuarantineStatus.CLOSED)) {
                 this._setIsLocked(cookieStoreId, QuarantineStatus.CLOSED);
             }
         }

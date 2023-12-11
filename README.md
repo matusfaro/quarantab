@@ -153,8 +153,16 @@ npm run start firefox
 
 ## Release
 
-1. Bump and commit version in `package.json`
+1. Upgrade dependencies with `npm update`
 
-2. Build extension with `npm run build firefox`
+2. Bump version in `package.json`
 
-3. Upload `dist/firefox.xpi` to [Firefox Add-ons store](https://addons.mozilla.org/en-US/developers/addon/quarantab/versions)
+3. Run `npm install` to update lockfile
+
+4. Test extension with `npm run start firefox`
+
+5. Commit changes
+
+6. Build extension with `npm run build firefox`
+
+7. Upload `dist/firefox.xpi` to [Firefox Add-ons store](https://addons.mozilla.org/en-US/developers/addon/quarantab/versions)

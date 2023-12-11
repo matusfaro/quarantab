@@ -87,6 +87,10 @@ export default class Daemon {
     }
   }
 
+  webRequestOnBeforeRedirect(requestDetails: browser.webRequest._OnBeforeRedirectDetails): void {
+    this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'redirect');
+  }
+
   webRequestOnCompleted(requestDetails: browser.webRequest._OnCompletedDetails): void {
     this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'completed');
   }
@@ -95,35 +99,11 @@ export default class Daemon {
     this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'error');
   }
 
-  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestType: browser.webRequest.ResourceType, requestState: 'open' | 'completed' | 'error' | 'block'): Promise<void> {
+  async trackRequestStateChanged(cookieStoreId: string | undefined, requestId: string, requestType: browser.webRequest.ResourceType, requestState: 'open' | 'completed' | 'error' | 'redirect' | 'block'): Promise<void> {
     try {
       // If cookiestoreid is empty, not part of our container
       if (!cookieStoreId) {
         return;
-      }
-
-      // Decide whether we want to track this request type.
-      // https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/webRequest/ResourceType
-      switch (requestType) {
-        // In Firefox, when a shim is made for a particular tracker, the connection is seen as open, but
-        // it will never complete or error out. It is unfortunate we can't determine whether the connection
-        // is still open, or was shimmed by Firefox.
-        //
-        // Bug in Firefox: https://bugzilla.mozilla.org/show_bug.cgi?id=1869194
-        //
-        // We need to track connections that can send data back to a malicious server. The following request types
-        // can only send data at the initial connection so it is safe to use.
-        // Other requests that are long-lived such websocket and server-sent events are ones we need
-        // to continue tracking.
-        case 'script':
-        case 'stylesheet':
-        case 'ping':
-        case 'font':
-        case 'imageset':
-        case 'image':
-          return; // Don't track
-        default:
-          break; // Track
       }
 
       // Determine the container status where this request is being made
@@ -274,6 +254,7 @@ export default class Daemon {
     // This is to avoid listening when the extension is not in use, when no containers are open
     const proxyOnRequestListener = this.onProxyRequest.bind(this)
     const webRequestOnBeforeRequestListener = this.webRequestOnBeforeRequestBlocking.bind(this)
+    const webRequestOnBeforeRedirectListener = this.webRequestOnBeforeRedirect.bind(this)
     const webRequestOnCompletedRequestListener = this.webRequestOnCompleted.bind(this)
     const webRequestOnErrorOccurredRequestListener = this.webRequestOnErrorOccurred.bind(this)
     const startBlockingListeners = () => {
@@ -282,9 +263,16 @@ export default class Daemon {
       this._browser.proxy.onRequest.hasListener(proxyOnRequestListener)
         || this._browser.proxy.onRequest.addListener(proxyOnRequestListener, { urls: ['<all_urls>'] })
 
-      // Listen for requests start and stop to keep a running count of all active connections (non-blocking)
+      // Blocking listener for new requests to:
+      // - Block all requests for closed containers
+      // - Redirect new page loads on closed containers to a helpful info page
+      // - Keep a running count of open connections for each container
       this._browser.webRequest.onBeforeRequest.hasListener(webRequestOnBeforeRequestListener)
         || this._browser.webRequest.onBeforeRequest.addListener(webRequestOnBeforeRequestListener, { urls: ['<all_urls>'] }, ['blocking']);
+
+      // Listen for request completion, error or redirect to keep track of which requests have closed
+      this._browser.webRequest.onBeforeRedirect.hasListener(webRequestOnBeforeRedirectListener)
+        || this._browser.webRequest.onBeforeRedirect.addListener(webRequestOnBeforeRedirectListener, { urls: ['<all_urls>'] });
       this._browser.webRequest.onCompleted.hasListener(webRequestOnCompletedRequestListener)
         || this._browser.webRequest.onCompleted.addListener(webRequestOnCompletedRequestListener, { urls: ['<all_urls>'] });
       this._browser.webRequest.onErrorOccurred.hasListener(webRequestOnErrorOccurredRequestListener)
@@ -296,6 +284,8 @@ export default class Daemon {
       // Remove all dynamic listeners
       this._browser.proxy.onRequest.hasListener(proxyOnRequestListener)
         && this._browser.proxy.onRequest.removeListener(proxyOnRequestListener);
+      this._browser.webRequest.onBeforeRedirect.hasListener(webRequestOnBeforeRedirectListener)
+        && this._browser.webRequest.onBeforeRedirect.removeListener(webRequestOnBeforeRedirectListener);
       this._browser.webRequest.onBeforeRequest.hasListener(webRequestOnBeforeRequestListener)
         && this._browser.webRequest.onBeforeRequest.removeListener(webRequestOnBeforeRequestListener);
       this._browser.webRequest.onCompleted.hasListener(webRequestOnCompletedRequestListener)

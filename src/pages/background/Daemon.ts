@@ -155,7 +155,6 @@ export default class Daemon {
       }
 
       // Change state of request to open or close
-      console.log(`daemon: Connection ${requestState}, requestId ${requestId}, awaiting ${openRequestIds.size} openRequestIds ${[...openRequestIds]}`);
       if (requestState === 'open') {
         openRequestIds.add(requestId);
       } else {

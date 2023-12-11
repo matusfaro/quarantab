@@ -149,7 +149,12 @@ npm install
 
 # Live Dev
 npm run start firefox
-
-# Build
-npm run build firefox
 ```
+
+## Release
+
+1. Bump and commit version in `package.json`
+
+2. Build extension with `npm run build firefox`
+
+3. Upload `dist/firefox.xpi` to [Firefox Add-ons store](https://addons.mozilla.org/en-US/developers/addon/quarantab/versions)

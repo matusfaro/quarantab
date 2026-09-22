@@ -1,5 +1,4 @@
 import { BrowserType, QuaranTab, QuarantineStatus, Runner, getQuaranTabInstance } from '@src/lib/quarantab'
-import { close } from 'fs-extra'
 
 const WebRequestAllow: browser.webRequest.BlockingResponse = {}
 const WebRequestBlock: browser.webRequest.BlockingResponse = {
@@ -34,6 +33,16 @@ export default class Daemon {
     this._browser = browserInstance;
     const { startBlockingListeners, stopBlockingListeners } = this.prepareControllableListeners();
     this._quarantab = getQuaranTabInstance(Runner.BACKGROUND, startBlockingListeners, stopBlockingListeners);
+
+    // Firefox drops an extension's listeners when the background context is reloaded, while any
+    // tabs in our Containers stay alive and keep running. Start the blocking listeners here, before
+    // anything asynchronous happens, so a locked Container is never left without a network blocker.
+    // Container state is still loading at this point; requests arriving in the meantime await the
+    // pending state in checkStatus and are blocked once it resolves. Loading then stops these
+    // listeners again if it turns out we own no Containers. Everything up to this call must stay
+    // synchronous, otherwise the gap this closes comes back.
+    startBlockingListeners();
+
     this.runListeners();
   }
 

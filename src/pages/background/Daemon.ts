@@ -257,6 +257,14 @@ export default class Daemon {
     }
   }
 
+  networkPredictionOnChange(details: browser.types._OnChangeDetails): void {
+    try {
+      this._quarantab.onNetworkPredictionEnabledChanged(!!details.value);
+    } catch (e: unknown) {
+      console.error(`Error in networkPredictionOnChange listener: ${e as string}`)
+    }
+  }
+
   prepareControllableListeners(): { startBlockingListeners: () => void, stopBlockingListeners: () => void } {
 
     // Methods to start/stop listeners for the purposes of blocking network access
@@ -319,5 +327,8 @@ export default class Daemon {
 
     // Listen for global WebRTC enable state changes
     this._browser.privacy.network.peerConnectionEnabled.onChange.addListener(this.peerConnectionOnChange.bind(this));
+
+    // Listen for global network prediction enable state changes
+    this._browser.privacy.network.networkPredictionEnabled.onChange.addListener(this.networkPredictionOnChange.bind(this));
   }
 }

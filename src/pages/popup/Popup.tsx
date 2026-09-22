@@ -461,6 +461,12 @@ export default function Popup(): JSX.Element {
             <Typography variant='caption'></Typography>
             <p>QuaranTab extension quarantines a website and prevents it from communicating with other websites in your browser and the internet.</p>
             <p>This makes it safe for you to use a website offline with sensitive information</p>
+            <p>While a container is open, two settings are turned off for your whole browser and given back when you close it:</p>
+            <ul>
+              <li>The WebRTC API, used to talk to other clients directly</li>
+              <li>Network prediction, the speculative DNS lookups your browser makes ahead of time</li>
+            </ul>
+            <p>Neither can be turned off for a single tab from within an Addon.</p>
             <p>Some example use cases are:</p>
             <ul>
               <li>Parse a live JWT token</li>

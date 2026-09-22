@@ -164,7 +164,7 @@ export class QuaranTab {
      * A site that needs WebSockets will not work under quarantine, which is the same
      * trade-off this extension already makes for every other kind of request.
      */
-    async shouldBlockWebsocketOnOpen(): Promise<boolean> {
+    shouldBlockWebsocketOnOpen(): boolean {
         return true;
     }
 

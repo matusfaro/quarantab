@@ -111,13 +111,7 @@ export default function Popup(): JSX.Element {
     return () => unsubscribe();
   }, []);
 
-  const [shouldBlockWebsocketOnOpen, setShouldBlockWebsocketOnOpen] = useState<boolean>();
-  useEffect(() => {
-    getQuaranTabInstance(Runner.POPUP).shouldBlockWebsocketOnOpen()
-      .then((shouldBlock) => {
-        setShouldBlockWebsocketOnOpen(shouldBlock);
-      });
-  }, []);
+  const shouldBlockWebsocketOnOpen = getQuaranTabInstance(Runner.POPUP).shouldBlockWebsocketOnOpen();
 
   const eligibleForQuarantine = (tab: browser.tabs.Tab | undefined): string | true | undefined => {
     if (!tab

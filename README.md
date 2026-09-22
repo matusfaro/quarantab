@@ -1,5 +1,5 @@
 
-# QuarantTab
+# QuaranTab
 
 <a href="https://addons.mozilla.org/firefox/addon/quarantab/">
   <img src="img/firefox-get-addon.png" alt="Download on Firefox store"></img>

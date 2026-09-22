@@ -92,7 +92,7 @@ Interesting part is that the API semi-functions even without the [Multi-Account 
 Attacks this extension protects against:
 - Network access: Container is routed to a non-existent Socks proxy pointing to 127.0.0.1
 - DNS leaks by routing DNS requests via Socks: site could try to resolve my-sensitive-info.badsite.com
-- Speculative DNS leaks by disabling network prediction globally: a speculative lookup never becomes a request, so the Socks proxy never sees it
+- Speculative DNS leaks by disabling network prediction
 - Storing sensitive data in Storage and Cookies
 - Communicating with other websites
 

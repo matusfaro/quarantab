@@ -261,7 +261,7 @@ export default function Popup(): JSX.Element {
           {/* Websockets */}
           <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
             <Typography>WebSocket API</Typography>
-            <TooltipIcon title='WebSockets are used for two-way communication over a persistent connection with a server. We intercept proxy on-request to block new connections and a content script to terminate existing connections.' />
+            <TooltipIcon title='WebSockets are used for two-way communication over a persistent connection with a server. A connection that is already established survives the network lock, so we block WebSockets inside the container from the moment it is created.' />
           </Grid>
           <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
             <Chip

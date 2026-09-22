@@ -130,6 +130,7 @@ If you find a bug, please report it to me. A bug bounty is no longer available f
 - __+100 USD__ Replenished by @matusfaro (2023-09-11)
 - __-100 USD__ Discontinued @matusfaro (2026-09-22)
 - __Thumbs up__ to Sebastien Andersson for network access leaking out of a locked Container while the extension's background context reloads (2026-09-22)
+- __Thumbs up__ to Claude Fable 5.1 for a WebSocket held by a SharedWorker surviving the network lock (2026-09-22)
 
 ## Building
 

@@ -144,14 +144,28 @@ export class QuaranTab {
     }
 
     /**
-     * Special case whether to block WebSocket connections on open status.
-     * 
-     * In Firefox, we can terminate open WebSocket connections using window.stop()
-     * but in other browsers (e.g. Chrome) we cannot. So we must block WebSocket
-     * connections from starting even before network lock is requested
+     * Whether to block WebSocket connections from being established while a Container
+     * is still open, before network lock is requested.
+     *
+     * Cutting off the network only stops new requests. A WebSocket that is already
+     * established keeps its socket, and its handshake has already been reported as
+     * completed, so it does not hold the Container in the CLOSING state either. The
+     * Container reports itself as fully locked while the socket is still carrying data.
+     *
+     * The content script we inject on lock calls window.stop(), which cancels the
+     * document's load group and takes the page's own sockets with it. A socket opened
+     * inside a SharedWorker is not in that load group: once a shared worker's script has
+     * loaded, Gecko drops the worker's reference to the window it came from, so the
+     * socket is never added to a load group and window.stop() cannot reach it. A page can
+     * therefore park a socket in a SharedWorker before the lock and keep posting data to
+     * it afterwards. Extensions cannot inject into or terminate a worker.
+     *
+     * So never allow a WebSocket to be established inside our Containers, on any browser.
+     * A site that needs WebSockets will not work under quarantine, which is the same
+     * trade-off this extension already makes for every other kind of request.
      */
     async shouldBlockWebsocketOnOpen(): Promise<boolean> {
-        return (await this.getBrowserType()) !== BrowserType.FIREFOX;
+        return true;
     }
 
     /**

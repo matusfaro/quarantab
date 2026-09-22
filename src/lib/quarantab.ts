@@ -26,6 +26,9 @@ type Message = {
 } | {
     type: 'ON_WEBRTC_ENABLED_CHANGED',
     isEnabled: boolean,
+} | {
+    type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+    isEnabled: boolean,
 }
 
 export enum QuarantineStatus {
@@ -48,6 +51,7 @@ export const OpenText = '';
 export const ClosedText = ' - Locked';
 
 const WebRtcDisabledFlag = 'webrtc-disabled';
+const NetworkPredictionDisabledFlag = 'network-prediction-disabled';
 
 export enum BrowserType {
     FIREFOX,
@@ -73,6 +77,7 @@ export class QuaranTab {
     readonly _cookieStoreIdToIsLocked: Promise<Map<string, boolean>>;
     _onStatusChanged: (() => void) | undefined = undefined;
     _onWebRtcEnabledChangeListener: ((isEnabled: boolean) => void) | undefined;
+    _onNetworkPredictionEnabledChangeListener: ((isEnabled: boolean) => void) | undefined;
 
     constructor(runner: Runner, browserInstance: typeof browser, startupListeners?: () => void, shutdownListeners?: () => void) {
         this._runner = runner;
@@ -86,12 +91,34 @@ export class QuaranTab {
 
     async _startup(): Promise<void> {
         this._startupListeners?.();
-        await this.disableWebRtc();
+        // Both of these are global browser settings and both have to be taken for a Container to
+        // be safe. Attempt both even if one fails, so failing to take one does not silently leave
+        // the other in place, and report the first failure afterwards.
+        await this._allOrFirstError([
+            this.disableWebRtc(),
+            this.disableNetworkPrediction(),
+        ]);
     }
 
     async _shutdown(): Promise<void> {
         this._shutdownListeners?.();
-        await this.resetWebRtc();
+        await this._allOrFirstError([
+            this.resetWebRtc(),
+            this.resetNetworkPrediction(),
+        ]);
+    }
+
+    /**
+     * Await every promise and then rethrow the first rejection, so one failure does not skip the
+     * remaining work.
+     */
+    async _allOrFirstError(promises: Promise<void>[]): Promise<void> {
+        const results = await Promise.allSettled(promises);
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                throw result.reason;
+            }
+        }
     }
 
     /**
@@ -320,8 +347,109 @@ export class QuaranTab {
     }
 
     /**
+     * Check if network prediction is enabled globally in the browser.
+     */
+    async getNetworkPredictionEnabled(): Promise<browser.types._GetReturnDetails> {
+        const setting = await this._browser.privacy.network.networkPredictionEnabled.get({});
+        return setting;
+    }
+
+    /**
+     * Disable network prediction globally in the browser.
+     *
+     * Speculative lookups do not go through a channel, so neither proxy.onRequest nor
+     * webRequest.onBeforeRequest ever sees them and neither the bogus Socks proxy nor the request
+     * blocker applies. A page under quarantine can encode data in a hostname, ask for it with
+     * <link rel='dns-prefetch'>, and the resolver hands it to the attacker's name server.
+     *
+     * Firefox only refuses speculative lookups by itself when network.proxy.type is set to manual.
+     * An extension proxy is a channel filter and does not change that preference, so the lookups
+     * stay enabled for us. Turning off network prediction sets network.dns.disablePrefetch and
+     * clears network.prefetch-next, network.predictor.enabled and
+     * network.http.speculative-parallel-limit, which covers speculative DNS, the predictor and
+     * speculative connections together.
+     *
+     * Like WebRTC, this preference is global rather than per-Container, so it stays off for as long
+     * as any of our Containers is open.
+     */
+    async disableNetworkPrediction(): Promise<void> {
+        // Get current state
+        const setting = await this.getNetworkPredictionEnabled();
+        if (!setting.value) {
+            // Already disabled, nothing to do
+            return;
+        }
+        if (setting.levelOfControl === 'not_controllable') {
+            throw new Error('Network prediction cannot be changed by this extension');
+        }
+        if (setting.levelOfControl === 'controlled_by_other_extensions') {
+            throw new Error('Network prediction is controlled by other extensions');
+        }
+        // Disable it
+        await this._browser.privacy.network.networkPredictionEnabled.set({ value: false });
+        await this._browser.storage.local.set({ [NetworkPredictionDisabledFlag]: true });
+        this.onNetworkPredictionEnabledChanged(false);
+    }
+
+    /**
+     * Reset previously disabled network prediction globally in the browser to previous state.
+     */
+    async resetNetworkPrediction(): Promise<void> {
+        // Get current state
+        const setting = await this.getNetworkPredictionEnabled();
+        const isDisabledByUs = (await this._browser.storage.local.get(NetworkPredictionDisabledFlag))[NetworkPredictionDisabledFlag];
+        if (setting.levelOfControl !== 'controlled_by_this_extension' && !isDisabledByUs) {
+            // Most likely wasn't changed by our extension so let's leave it as is.
+            // Same caveat as resetWebRtc: a browser restart followed by clearing browsing data
+            // loses both the level of control and our flag.
+            return;
+        }
+        // Revert it back to previous state
+        await this._browser.privacy.network.networkPredictionEnabled.set({ value: true });
+        await this._browser.storage.local.remove(NetworkPredictionDisabledFlag);
+        this.onNetworkPredictionEnabledChanged(true);
+    }
+
+    /**
+     * Subscribe to changes when network prediction is enabled or disabled.
+     *
+     * @param onChanged callback for when network prediction is enabled or disabled
+     * @returns Unsubscribe function
+     */
+    subscribeNetworkPredictionStatusChanged(onChanged: (isEnabled: boolean) => void): Unsubscribe {
+        this._onNetworkPredictionEnabledChangeListener = onChanged;
+        this.getNetworkPredictionEnabled().then(setting => onChanged(!!setting.value));
+        return () => {
+            if (this._onNetworkPredictionEnabledChangeListener === onChanged) {
+                this._onNetworkPredictionEnabledChangeListener = undefined;
+            }
+        }
+    }
+
+    /**
+     * Call when network prediction is enabled or disabled from on change listener to notify
+     * downstream subscribers.
+     *
+     * @param isEnabled
+     */
+    onNetworkPredictionEnabledChanged(isEnabled: boolean): void {
+        // Let popup know network prediction changed
+        if (this._runner === Runner.BACKGROUND) {
+            const message: Message = {
+                type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+                isEnabled,
+            };
+            this._browser.runtime.sendMessage(message)
+                .catch(err => { /* Expected if popup is closed */ });
+        }
+
+        // Let subscribers know
+        this._onNetworkPredictionEnabledChangeListener?.(isEnabled);
+    }
+
+    /**
      * Subscribe to changes when WebRTC is enabled or disabled.
-     * 
+     *
      * @param onChanged callback for when WebRTC is enabled or disabled
      * @returns Unsubscribe function
      */
@@ -585,6 +713,10 @@ export class QuaranTab {
                     // Webrtc enabled changed
                     this.onWebRtcEnabledChanged(message.isEnabled);
                 }
+                if (message.type === 'ON_NETWORK_PREDICTION_ENABLED_CHANGED') {
+                    // Network prediction enabled changed
+                    this.onNetworkPredictionEnabledChanged(message.isEnabled);
+                }
             }
             this._browser.runtime.onMessage.addListener(messageListener);
         }
@@ -758,14 +890,22 @@ export class QuaranTab {
                 }
             }
         }
-        if (hasActiveContainers) {
-            // Need to ensure our listeners are started if we detect we have existing tabs open
-            console.log(`${this._runner}: Our containers detected, starting up listeners`);
-            await this._startup();
-        } else {
-            // If we don't have any containers, shutdown to cleanup any leftover
-            // state (e.g. WebRTC enable flag) if the browser was not shut down cleanly.
-            await this._shutdown();
+        // A global setting we cannot take is worth reporting, but it must not cost us the Container
+        // state we just built: without it checkStatus cannot tell our Containers apart and every
+        // request is allowed through, which is a far bigger hole than the one we failed to close.
+        // Creating a Container still fails loudly, that path calls _startup directly.
+        try {
+            if (hasActiveContainers) {
+                // Need to ensure our listeners are started if we detect we have existing tabs open
+                console.log(`${this._runner}: Our containers detected, starting up listeners`);
+                await this._startup();
+            } else {
+                // If we don't have any containers, shutdown to cleanup any leftover
+                // state (e.g. WebRTC enable flag) if the browser was not shut down cleanly.
+                await this._shutdown();
+            }
+        } catch (err) {
+            console.error(`${this._runner}: Failed to apply the global network settings`, err);
         }
         return cookieStoreIdsToIsLocked;
     }

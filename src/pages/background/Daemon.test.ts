@@ -83,6 +83,11 @@ function mockBrowser(containers: { promise: Promise<any[]> }) {
             set: jest.fn(async () => undefined),
             onChange: mockEvent(),
           },
+          networkPredictionEnabled: {
+            get: jest.fn(async () => ({ value: true, levelOfControl: 'controllable_by_this_extension' })),
+            set: jest.fn(async () => undefined),
+            onChange: mockEvent(),
+          },
         },
       },
       storage: {
@@ -180,5 +185,128 @@ describe('Daemon blocking listeners across a background reload', () => {
     // Nothing of ours is open, so we go back to not intercepting the user's other traffic
     expect(mock.proxyOnRequest.listeners).toHaveLength(0)
     expect(mock.webRequestOnBeforeRequest.listeners).toHaveLength(0)
+  })
+})
+
+/**
+ * Speculative DNS lookups never become a request, so neither the proxy nor the request blocker
+ * sees them and a page can leak data by asking for a hostname it encoded. Network prediction is a
+ * global browser setting, so we take it for as long as one of our Containers is open, the same way
+ * we take WebRTC.
+ */
+describe('Network prediction while our Containers are open', () => {
+
+  let Daemon: any
+
+  beforeEach(() => {
+    jest.resetModules()
+    Daemon = require('./Daemon').default
+  })
+
+  it('disables network prediction when a Container is found on startup', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    expect(mock.api.privacy.network.networkPredictionEnabled.set).toHaveBeenCalledWith({ value: false })
+    // And we remember that we were the one who turned it off
+    expect(mock.api.storage.local.set).toHaveBeenCalledWith({ 'network-prediction-disabled': true })
+  })
+
+  it('restores network prediction once no Containers of ours are left', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+    mock.api.privacy.network.networkPredictionEnabled.get =
+      jest.fn(async () => ({ value: false, levelOfControl: 'controlled_by_this_extension' })) as any
+
+    new Daemon(mock.api)
+    containers.resolve([])
+    await settle()
+
+    expect(mock.api.privacy.network.networkPredictionEnabled.set).toHaveBeenCalledWith({ value: true })
+    expect(mock.api.storage.local.remove).toHaveBeenCalledWith('network-prediction-disabled')
+  })
+
+  it('leaves network prediction alone when it is already disabled', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+    mock.api.privacy.network.networkPredictionEnabled.get =
+      jest.fn(async () => ({ value: false, levelOfControl: 'controllable_by_this_extension' })) as any
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    // The user already had it off, so there is nothing to take and nothing to give back later
+    expect(mock.api.privacy.network.networkPredictionEnabled.set).not.toHaveBeenCalled()
+    expect(mock.api.storage.local.set).not.toHaveBeenCalledWith({ 'network-prediction-disabled': true })
+  })
+
+  it('still disables network prediction when WebRTC cannot be taken', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+    mock.api.privacy.network.peerConnectionEnabled.get =
+      jest.fn(async () => ({ value: true, levelOfControl: 'controlled_by_other_extensions' })) as any
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    // One protection failing must not silently skip the other
+    expect(mock.api.privacy.network.networkPredictionEnabled.set).toHaveBeenCalledWith({ value: false })
+  })
+
+  it('tells the popup when network prediction is taken and given back', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    // The popup renders its chip from this message, so it has to reflect what we just did
+    expect(mock.api.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+      isEnabled: false,
+    })
+
+    // And the browser telling us it changed underneath us is passed on as well
+    const onChange = mock.api.privacy.network.networkPredictionEnabled.onChange.listeners[0]
+    onChange({ value: true })
+    expect(mock.api.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+      isEnabled: true,
+    })
+  })
+
+  it('still blocks a locked Container when a global setting cannot be taken', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+    mock.api.privacy.network.peerConnectionEnabled.get =
+      jest.fn(async () => ({ value: true, levelOfControl: 'controlled_by_other_extensions' })) as any
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    // Losing the Container state here would leave every Container unrecognised and every request
+    // allowed, which is worse than the setting we could not take
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    expect(await onBeforeRequest({
+      cookieStoreId: LockedCookieStoreId,
+      requestId: '9',
+      type: 'xmlhttprequest',
+      url: 'http://attacker.example/leak',
+      tabId: 1,
+    })).toEqual({ cancel: true })
   })
 })

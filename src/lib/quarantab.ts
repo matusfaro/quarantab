@@ -26,6 +26,9 @@ type Message = {
 } | {
     type: 'ON_WEBRTC_ENABLED_CHANGED',
     isEnabled: boolean,
+} | {
+    type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+    isEnabled: boolean,
 }
 
 export enum QuarantineStatus {
@@ -74,6 +77,7 @@ export class QuaranTab {
     readonly _cookieStoreIdToIsLocked: Promise<Map<string, boolean>>;
     _onStatusChanged: (() => void) | undefined = undefined;
     _onWebRtcEnabledChangeListener: ((isEnabled: boolean) => void) | undefined;
+    _onNetworkPredictionEnabledChangeListener: ((isEnabled: boolean) => void) | undefined;
 
     constructor(runner: Runner, browserInstance: typeof browser, startupListeners?: () => void, shutdownListeners?: () => void) {
         this._runner = runner;
@@ -384,6 +388,7 @@ export class QuaranTab {
         // Disable it
         await this._browser.privacy.network.networkPredictionEnabled.set({ value: false });
         await this._browser.storage.local.set({ [NetworkPredictionDisabledFlag]: true });
+        this.onNetworkPredictionEnabledChanged(false);
     }
 
     /**
@@ -402,6 +407,44 @@ export class QuaranTab {
         // Revert it back to previous state
         await this._browser.privacy.network.networkPredictionEnabled.set({ value: true });
         await this._browser.storage.local.remove(NetworkPredictionDisabledFlag);
+        this.onNetworkPredictionEnabledChanged(true);
+    }
+
+    /**
+     * Subscribe to changes when network prediction is enabled or disabled.
+     *
+     * @param onChanged callback for when network prediction is enabled or disabled
+     * @returns Unsubscribe function
+     */
+    subscribeNetworkPredictionStatusChanged(onChanged: (isEnabled: boolean) => void): Unsubscribe {
+        this._onNetworkPredictionEnabledChangeListener = onChanged;
+        this.getNetworkPredictionEnabled().then(setting => onChanged(!!setting.value));
+        return () => {
+            if (this._onNetworkPredictionEnabledChangeListener === onChanged) {
+                this._onNetworkPredictionEnabledChangeListener = undefined;
+            }
+        }
+    }
+
+    /**
+     * Call when network prediction is enabled or disabled from on change listener to notify
+     * downstream subscribers.
+     *
+     * @param isEnabled
+     */
+    onNetworkPredictionEnabledChanged(isEnabled: boolean): void {
+        // Let popup know network prediction changed
+        if (this._runner === Runner.BACKGROUND) {
+            const message: Message = {
+                type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+                isEnabled,
+            };
+            this._browser.runtime.sendMessage(message)
+                .catch(err => { /* Expected if popup is closed */ });
+        }
+
+        // Let subscribers know
+        this._onNetworkPredictionEnabledChangeListener?.(isEnabled);
     }
 
     /**
@@ -669,6 +712,10 @@ export class QuaranTab {
                 if (message.type === 'ON_WEBRTC_ENABLED_CHANGED') {
                     // Webrtc enabled changed
                     this.onWebRtcEnabledChanged(message.isEnabled);
+                }
+                if (message.type === 'ON_NETWORK_PREDICTION_ENABLED_CHANGED') {
+                    // Network prediction enabled changed
+                    this.onNetworkPredictionEnabledChanged(message.isEnabled);
                 }
             }
             this._browser.runtime.onMessage.addListener(messageListener);

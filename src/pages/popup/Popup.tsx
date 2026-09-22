@@ -22,6 +22,7 @@ import Close from "./icons/Close";
 import WebSocket from "./icons/WebSocket";
 import WebRTC from "./icons/WebRTC";
 import Dns from "./icons/Dns";
+import OnlinePrediction from "./icons/OnlinePrediction";
 
 const theme: Theme = createTheme({
   palette: {
@@ -108,6 +109,13 @@ export default function Popup(): JSX.Element {
   useEffect(() => {
     const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeWebRtcStatusChanged(
       isEnabled => setWebRtcEnabled(isEnabled));
+    return () => unsubscribe();
+  }, []);
+
+  const [networkPredictionEnabled, setNetworkPredictionEnabled] = useState<boolean>();
+  useEffect(() => {
+    const unsubscribe = getQuaranTabInstance(Runner.POPUP).subscribeNetworkPredictionStatusChanged(
+      isEnabled => setNetworkPredictionEnabled(isEnabled));
     return () => unsubscribe();
   }, []);
 
@@ -315,6 +323,23 @@ export default function Popup(): JSX.Element {
                   ? 'warning'
                   : 'success')}
               icon={(<Dns />)}
+              sx={{ width: 120 }}
+            />
+          </Grid>
+
+          {/* Speculative DNS */}
+          <Grid xs={6} xsOffset={1} display='flex' direction='row' alignItems='center'>
+            <Typography>Speculative DNS</Typography>
+            <TooltipIcon title='Browsers look up hostnames ahead of time to speed up browsing. A speculative lookup never becomes a request, so it cannot be routed through the Socks proxy and a site could use one to leak data in a hostname. While you are using a container, network prediction is disabled for the entire browser. This is because a per-tab setting is not possible from within an Addon.' />
+          </Grid>
+          <Grid xs={5} display='flex' alignItems='center' justifyContent='center'>
+            <Chip
+              label={networkPredictionEnabled === undefined ? ("Unknown") : (!!networkPredictionEnabled ? ("ENABLED") : ("DISABLED"))}
+              color={(status === undefined || status === QuarantineStatus.NONE || networkPredictionEnabled === undefined)
+                ? 'default' : (!!networkPredictionEnabled
+                  ? 'warning'
+                  : 'success')}
+              icon={(<OnlinePrediction />)}
               sx={{ width: 120 }}
             />
           </Grid>

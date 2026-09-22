@@ -263,6 +263,30 @@ describe('Network prediction while our Containers are open', () => {
     expect(mock.api.privacy.network.networkPredictionEnabled.set).toHaveBeenCalledWith({ value: false })
   })
 
+  it('tells the popup when network prediction is taken and given back', async () => {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+
+    new Daemon(mock.api)
+    containers.resolve([{ cookieStoreId: LockedCookieStoreId, name: `QuaranTab${ClosedText}` }])
+    await settle()
+
+    // The popup renders its chip from this message, so it has to reflect what we just did
+    expect(mock.api.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+      isEnabled: false,
+    })
+
+    // And the browser telling us it changed underneath us is passed on as well
+    const onChange = mock.api.privacy.network.networkPredictionEnabled.onChange.listeners[0]
+    onChange({ value: true })
+    expect(mock.api.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'ON_NETWORK_PREDICTION_ENABLED_CHANGED',
+      isEnabled: true,
+    })
+  })
+
   it('still blocks a locked Container when a global setting cannot be taken', async () => {
     const containers = deferred<any[]>()
     const mock = mockBrowser(containers)

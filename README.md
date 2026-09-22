@@ -121,26 +121,14 @@ Due to the nature of this extension, it requires a lot of permissions. Ideally F
 
 ## Bug bounty
 
-If you find a bug, please report it to me. A bug bounty is available for this project as long as it meets the following criteria:
+If you find a bug, please report it to me. A bug bounty is no longer available for this project.
 
-1. The bug shows an exploit to exfiltrate data out of a website that is under a locked-down quarantine.
-2. You are the first person to report the bug.
-3. There are funds available in the bug bounty.
-4. The amount is proportional to the severity of the bug at our discretion.
-5. For an exploit that leaks any data under all circumstances, the bounty would be 100 USD.
-6. The bug exists in this extension or the design of it. It excludes explots in the browser itself, the contextualIdentities implementation or isolation guarantees.
-
-### Bug bounty pool
-
-Available: __100 USD__
-
-_the amount will grow in the future proportionally to my confidence_
-
-#### History
+### History
 
 - __+100 USD__ Initial pool by @matusfaro (2023-09-10)
 - __-100 USD__ to @dz2742 for [Established WebSocket session remains open](https://github.com/matusfaro/quarantab/issues/2) (2023-09-11)
 - __+100 USD__ Replenished by @matusfaro (2023-09-11)
+- __-100 USD__ Discontinued @matusfaro (2026-09-22)
 
 ## Building
 

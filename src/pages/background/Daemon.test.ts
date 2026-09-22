@@ -8,6 +8,7 @@ import { ClosedText } from '@src/lib/quarantab'
  */
 
 const LockedCookieStoreId = 'firefox-container-7'
+const OpenCookieStoreId = 'firefox-container-8'
 
 type MockFn = ReturnType<typeof jest.fn>
 
@@ -308,5 +309,122 @@ describe('Network prediction while our Containers are open', () => {
       url: 'http://attacker.example/leak',
       tabId: 1,
     })).toEqual({ cancel: true })
+  })
+})
+
+/**
+ * A WebSocket that is established before the network is cut off keeps its socket. The content
+ * script we inject calls window.stop(), which only reaches sockets in the document's load group,
+ * so a socket held by a SharedWorker survives the lock and can still carry data out. These tests
+ * pin down that no WebSocket is ever established inside one of our Containers.
+ */
+describe('WebSocket handshakes inside our Containers', () => {
+
+  let Daemon: any
+
+  beforeEach(() => {
+    jest.resetModules()
+    Daemon = require('./Daemon').default
+  })
+
+  async function daemonWithOpenContainer() {
+    const containers = deferred<any[]>()
+    const mock = mockBrowser(containers)
+    ;(global as any).browser = mock.api
+
+    const daemon = new Daemon(mock.api)
+
+    // Our Container exists and is not locked yet, which is when a page can still reach the network
+    containers.resolve([{ cookieStoreId: OpenCookieStoreId, name: 'QuaranTab' }])
+    await settle()
+
+    return { mock, daemon }
+  }
+
+  const websocketRequest = {
+    cookieStoreId: OpenCookieStoreId,
+    requestId: '1',
+    type: 'websocket',
+    url: 'wss://attacker.example/collect',
+    tabId: 1,
+  }
+
+  it('blocks a WebSocket handshake while the Container is still open', async () => {
+    const { mock } = await daemonWithOpenContainer()
+
+    // Firefox is the browser under test here, where window.stop() was assumed to be enough
+    expect(await mock.api.runtime.getBrowserInfo()).toEqual({ name: 'Firefox', vendor: 'Mozilla' })
+
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+
+    expect(await onBeforeRequest(websocketRequest)).toEqual({ cancel: true })
+    expect(await onProxyRequest(websocketRequest)).toEqual(expect.objectContaining({ type: 'socks4', port: 1 }))
+  })
+
+  it('does not count a blocked handshake as an open connection', async () => {
+    const { mock } = await daemonWithOpenContainer()
+
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+    await onBeforeRequest(websocketRequest)
+    await onProxyRequest(websocketRequest)
+    await settle()
+
+    // A blocked handshake must not hold the Container in CLOSING once the user locks it
+    const { Runner, getQuaranTabInstance } = require('@src/lib/quarantab')
+    expect(getQuaranTabInstance(Runner.BACKGROUND).getCookieStoreOpenRequestCount(OpenCookieStoreId)).toBe(0)
+  })
+
+  it('does not accumulate request bookkeeping for repeated blocked handshakes', async () => {
+    const { mock, daemon } = await daemonWithOpenContainer()
+
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onErrorOccurred = mock.webRequestOnErrorOccurred.listeners[0]
+
+    // Firefox resolves the proxy while admitting a WebSocket, before the handshake channel is
+    // opened, so the proxy sees the request first and the cancellation arrives afterwards as an
+    // error. A page retrying its connection must not grow either of the request id sets.
+    for (let i = 0; i < 25; i++) {
+      const details = { ...websocketRequest, requestId: `ws-${i}` }
+      await onProxyRequest(details)
+      await onBeforeRequest(details)
+      await onErrorOccurred(details)
+    }
+    await settle()
+
+    expect(daemon._cookieStoreIdToClosedRequestIds.get(OpenCookieStoreId)).toBeUndefined()
+    expect(daemon._cookieStoreIdToOpenRequestIds.get(OpenCookieStoreId)).toBeUndefined()
+  })
+
+  it('still allows ordinary requests while the Container is open', async () => {
+    const { mock } = await daemonWithOpenContainer()
+
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+
+    const pageLoad = {
+      cookieStoreId: OpenCookieStoreId,
+      requestId: '2',
+      type: 'main_frame',
+      url: 'https://jwt.io/',
+      tabId: 1,
+    }
+
+    expect(await onBeforeRequest(pageLoad)).toEqual({})
+    expect(await onProxyRequest(pageLoad)).toEqual({ type: 'direct' })
+  })
+
+  it('leaves WebSockets outside our Containers alone', async () => {
+    const { mock } = await daemonWithOpenContainer()
+
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+
+    const otherWebsocket = { ...websocketRequest, cookieStoreId: 'firefox-default', requestId: '3' }
+
+    expect(await onBeforeRequest(otherWebsocket)).toEqual({})
+    expect(await onProxyRequest(otherWebsocket)).toEqual({ type: 'direct' })
   })
 })

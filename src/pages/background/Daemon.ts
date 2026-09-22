@@ -59,7 +59,7 @@ export default class Daemon {
         case QuarantineStatus.OPEN:
           if (requestDetails.type === 'websocket') {
             // Special handling for websockets, see method for details
-            return (await this._quarantab.shouldBlockWebsocketOnOpen()) ? WebRequestBlock : WebRequestAllow;
+            return this._quarantab.shouldBlockWebsocketOnOpen() ? WebRequestBlock : WebRequestAllow;
           }
           break;
         // Part of our container and container is now blocked
@@ -195,7 +195,7 @@ export default class Daemon {
         case QuarantineStatus.OPEN:
           if (requestDetails.type === 'websocket') {
             // Special handling for websockets, see method for details
-            if (await this._quarantab.shouldBlockWebsocketOnOpen()) {
+            if (this._quarantab.shouldBlockWebsocketOnOpen()) {
               this.trackRequestStateChanged(requestDetails.cookieStoreId, requestDetails.requestId, requestDetails.type, 'block');
               return ProxyRequestBlock;
             }

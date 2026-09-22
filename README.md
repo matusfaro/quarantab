@@ -92,6 +92,7 @@ Interesting part is that the API semi-functions even without the [Multi-Account 
 Attacks this extension protects against:
 - Network access: Container is routed to a non-existent Socks proxy pointing to 127.0.0.1
 - DNS leaks by routing DNS requests via Socks: site could try to resolve my-sensitive-info.badsite.com
+- Speculative DNS leaks by disabling network prediction globally: a speculative lookup never becomes a request, so the Socks proxy never sees it
 - Storing sensitive data in Storage and Cookies
 - Communicating with other websites
 
@@ -112,11 +113,11 @@ Due to the nature of this extension, it requires a lot of permissions. Ideally F
 - "tabs" - Required to re-open a tab in a new container
 - "cookies" - Required for manipulating Container data and clearing browser data for temporary containers
 - "contextualIdentities" - Required for creating/deleting Containers
-- "privacy" - Required for temporarily disabling WebRTC globally
+- "privacy" - Required for temporarily disabling WebRTC and network prediction globally
 - "webRequest" - Required for monitoring active connections to determine when it's safe to use 
 - "webRequestBlocking" - Required for blocking active connections and to redirect blocked page loads to an informational page
 - "scripting" - Required for injecting a content script for shutting down active connections
-- "storage" - Required for keeping track of WebRTC initial enable state
+- "storage" - Required for keeping track of the WebRTC and network prediction initial enable state
 - "<all_urls>" - Required to intercept proxy web requests for all sites
 
 ## Bug bounty
@@ -130,6 +131,7 @@ If you find a bug, please report it to me. A bug bounty is no longer available f
 - __+100 USD__ Replenished by @matusfaro (2023-09-11)
 - __-100 USD__ Discontinued @matusfaro (2026-09-22)
 - __Thumbs up__ to Sebastien Andersson for network access leaking out of a locked Container while the extension's background context reloads (2026-09-22)
+- __Thumbs up__ to Claude Fable 5.1 for data leaving a locked Container over speculative DNS lookups (2026-09-22)
 
 ## Building
 

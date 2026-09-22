@@ -123,18 +123,13 @@ Due to the nature of this extension, it requires a lot of permissions. Ideally F
 
 If you find a bug, please report it to me. A bug bounty is no longer available for this project.
 
-### Credits
-
-Reports that made QuaranTab safer, outside of any bounty:
-
-- __Sebastian__ for network access leaking out of a locked Container while the extension's background context reloads (2026-09-22)
-
 ### History
 
 - __+100 USD__ Initial pool by @matusfaro (2023-09-10)
 - __-100 USD__ to @dz2742 for [Established WebSocket session remains open](https://github.com/matusfaro/quarantab/issues/2) (2023-09-11)
 - __+100 USD__ Replenished by @matusfaro (2023-09-11)
 - __-100 USD__ Discontinued @matusfaro (2026-09-22)
+- __Thumbs up__ to Sebastien Andersson for network access leaking out of a locked Container while the extension's background context reloads (2026-09-22)
 
 ## Building
 

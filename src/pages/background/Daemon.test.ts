@@ -204,13 +204,13 @@ describe('WebSocket handshakes inside our Containers', () => {
     const mock = mockBrowser(containers)
     ;(global as any).browser = mock.api
 
-    new Daemon(mock.api)
+    const daemon = new Daemon(mock.api)
 
     // Our Container exists and is not locked yet, which is when a page can still reach the network
     containers.resolve([{ cookieStoreId: OpenCookieStoreId, name: 'QuaranTab' }])
     await settle()
 
-    return mock
+    return { mock, daemon }
   }
 
   const websocketRequest = {
@@ -222,7 +222,7 @@ describe('WebSocket handshakes inside our Containers', () => {
   }
 
   it('blocks a WebSocket handshake while the Container is still open', async () => {
-    const mock = await daemonWithOpenContainer()
+    const { mock } = await daemonWithOpenContainer()
 
     // Firefox is the browser under test here, where window.stop() was assumed to be enough
     expect(await mock.api.runtime.getBrowserInfo()).toEqual({ name: 'Firefox', vendor: 'Mozilla' })
@@ -235,7 +235,7 @@ describe('WebSocket handshakes inside our Containers', () => {
   })
 
   it('does not count a blocked handshake as an open connection', async () => {
-    const mock = await daemonWithOpenContainer()
+    const { mock } = await daemonWithOpenContainer()
 
     const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
     const onProxyRequest = mock.proxyOnRequest.listeners[0]
@@ -248,8 +248,30 @@ describe('WebSocket handshakes inside our Containers', () => {
     expect(getQuaranTabInstance(Runner.BACKGROUND).getCookieStoreOpenRequestCount(OpenCookieStoreId)).toBe(0)
   })
 
+  it('does not accumulate request bookkeeping for repeated blocked handshakes', async () => {
+    const { mock, daemon } = await daemonWithOpenContainer()
+
+    const onProxyRequest = mock.proxyOnRequest.listeners[0]
+    const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
+    const onErrorOccurred = mock.webRequestOnErrorOccurred.listeners[0]
+
+    // Firefox resolves the proxy while admitting a WebSocket, before the handshake channel is
+    // opened, so the proxy sees the request first and the cancellation arrives afterwards as an
+    // error. A page retrying its connection must not grow either of the request id sets.
+    for (let i = 0; i < 25; i++) {
+      const details = { ...websocketRequest, requestId: `ws-${i}` }
+      await onProxyRequest(details)
+      await onBeforeRequest(details)
+      await onErrorOccurred(details)
+    }
+    await settle()
+
+    expect(daemon._cookieStoreIdToClosedRequestIds.get(OpenCookieStoreId)).toBeUndefined()
+    expect(daemon._cookieStoreIdToOpenRequestIds.get(OpenCookieStoreId)).toBeUndefined()
+  })
+
   it('still allows ordinary requests while the Container is open', async () => {
-    const mock = await daemonWithOpenContainer()
+    const { mock } = await daemonWithOpenContainer()
 
     const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
     const onProxyRequest = mock.proxyOnRequest.listeners[0]
@@ -267,7 +289,7 @@ describe('WebSocket handshakes inside our Containers', () => {
   })
 
   it('leaves WebSockets outside our Containers alone', async () => {
-    const mock = await daemonWithOpenContainer()
+    const { mock } = await daemonWithOpenContainer()
 
     const onBeforeRequest = mock.webRequestOnBeforeRequest.listeners[0]
     const onProxyRequest = mock.proxyOnRequest.listeners[0]

@@ -158,6 +158,6 @@ npm run start firefox
 
 6. Commit changes
 
-7. Build extension with `npm run build firefox` (Call it twice as first time always fails)
+7. Build extension with `npm run build firefox`, using Node 16 as pinned in `.nvmrc` (`nvm use 16`). Newer Node versions fail to load the build script.
 
 8. Upload `dist/firefox.xpi` to [Firefox Add-ons store](https://addons.mozilla.org/en-US/developers/addon/quarantab/versions)

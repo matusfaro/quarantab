@@ -480,7 +480,7 @@ function MatchExtVersions(browsers: BrowserPath[]) {
   return Array.from(versions);
 }
 
-function BuildBrowserExt(browsers: string[]) {
+async function BuildBrowserExt(browsers: string[]) {
   const matchedBrowsers = MatchInstalledBrowsers(browsers);
 
   if (matchedBrowsers.length === 0) {
@@ -490,7 +490,7 @@ function BuildBrowserExt(browsers: string[]) {
 
   const versions = MatchExtVersions(matchedBrowsers);
 
-  BuildVersionedExt(versions);
+  await BuildVersionedExt(versions);
 
   for (const matchedBrowser of matchedBrowsers) {
     const version = manifestVersion(matchedBrowser);
@@ -500,7 +500,7 @@ function BuildBrowserExt(browsers: string[]) {
 
     fse.copySync(inputDir, outDir);
 
-    zipDirectory(outDir, resolve(OutDir, kebab + '.xpi'))
+    await zipDirectory(outDir, resolve(OutDir, kebab + '.xpi'));
   }
 }
 
@@ -644,7 +644,10 @@ function Init() {
   if (dev) {
     DevBrowserExt(browsers);
   } else {
-    BuildBrowserExt(browsers);
+    BuildBrowserExt(browsers).catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
   }
 }
 

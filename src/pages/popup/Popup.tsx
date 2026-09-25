@@ -5,7 +5,7 @@ import LogoYellow from '@assets/img/logo-yellow.svg';
 import LogoRed from '@assets/img/logo-red.svg';
 import LogoGreen from '@assets/img/logo-green.svg';
 import LogoGrey from '@assets/img/logo-grey.svg';
-import { Alert, Box, Button, Checkbox, Chip, Collapse, CssBaseline, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Stack, Theme, ThemeProvider, Tooltip, Typography, createMuiTheme } from "@mui/material";
+import { Alert, Box, Button, Checkbox, Chip, CssBaseline, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Stack, Theme, ThemeProvider, Tooltip, Typography, createMuiTheme } from "@mui/material";
 import { LoadingButton } from "@mui/lab";
 import Grid from '@mui/material/Unstable_Grid2';
 import Groups from "./icons/Group";
@@ -340,7 +340,7 @@ export default function Popup(): JSX.Element {
         </Grid>
 
         {/* Actionable buttons for current state */}
-        <Collapse in={status === QuarantineStatus.NONE}>
+        {status === QuarantineStatus.NONE && (
           <Grid container margin={theme.spacing(1)} spacing={2}>
             <Grid xs={6} display='flex' alignItems='center' justifyContent='center'>
               <LoadingButton
@@ -366,8 +366,8 @@ export default function Popup(): JSX.Element {
               </LoadingButton>
             </Grid>
           </Grid>
-        </Collapse>
-        <Collapse in={status === QuarantineStatus.OPEN}>
+        )}
+        {status === QuarantineStatus.OPEN && (
           <Grid container margin={theme.spacing(1)} spacing={2}>
             <Grid xs={12} display='flex' alignItems='center' justifyContent='center'>
               <LoadingButton
@@ -381,8 +381,8 @@ export default function Popup(): JSX.Element {
               </LoadingButton>
             </Grid>
           </Grid>
-        </Collapse>
-        <Collapse in={status === QuarantineStatus.CLOSING || status === QuarantineStatus.CLOSED}>
+        )}
+        {(status === QuarantineStatus.CLOSING || status === QuarantineStatus.CLOSED) && (
           <Grid container margin={theme.spacing(1)} spacing={2}>
             <Grid xs={12} display='flex' alignItems='center' justifyContent='center'>
               <LoadingButton
@@ -396,12 +396,12 @@ export default function Popup(): JSX.Element {
               </LoadingButton>
             </Grid>
           </Grid>
-        </Collapse>
+        )}
 
         <Box flexGrow={1} />
 
         {/* Show error message if present */}
-        <Collapse in={!!errorMsg}>
+        {!!errorMsg && (
           <Box margin={theme.spacing(1)}>
             <Alert severity='error' sx={{ m: 2 }} >
             <Typography>
@@ -409,10 +409,10 @@ export default function Popup(): JSX.Element {
             </Typography>
           </Alert>
           </Box>
-        </Collapse>
+        )}
 
         {/* State information text */}
-        <Collapse in={status === QuarantineStatus.OPEN}>
+        {status === QuarantineStatus.OPEN && (
           <Box margin={theme.spacing(1)}>
             <Alert severity='warning' sx={{ m: 2 }}>
               <Typography>
@@ -422,8 +422,8 @@ export default function Popup(): JSX.Element {
               </Typography>
             </Alert>
           </Box>
-        </Collapse>
-        <Collapse in={status === QuarantineStatus.CLOSING}>
+        )}
+        {status === QuarantineStatus.CLOSING && (
           <Box margin={theme.spacing(1)}>
             <Alert severity='error' sx={{ m: 2 }} >
               <Typography>
@@ -431,8 +431,8 @@ export default function Popup(): JSX.Element {
               </Typography>
             </Alert>
           </Box>
-        </Collapse>
-        <Collapse in={status === QuarantineStatus.CLOSED}>
+        )}
+        {status === QuarantineStatus.CLOSED && (
           <Box margin={theme.spacing(1)}>
             <Alert severity='success' sx={{ m: 2 }} >
               <Typography>
@@ -440,7 +440,7 @@ export default function Popup(): JSX.Element {
               </Typography>
             </Alert>
           </Box>
-        </Collapse>
+        )}
       </Box>
 
       {/* Help dialog */}

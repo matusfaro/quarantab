@@ -3,6 +3,18 @@
     <head>
         <meta charset="UTF-8" />
         <title>QuaranTab</title>
+        <style>
+            /* The popup sizes itself to its content, so a scrollbar only ever shows up mid
+               resize or for a few stray pixels, where it is noise. Hide it rather than turn
+               off overflow, so nothing becomes unreachable if the content does grow past the
+               height the browser is willing to give a popup. */
+            html, body {
+                scrollbar-width: none;
+            }
+            body::-webkit-scrollbar {
+                display: none;
+            }
+        </style>
     </head>
 
     <body>

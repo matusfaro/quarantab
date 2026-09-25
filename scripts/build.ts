@@ -112,6 +112,9 @@ async function buildHtmlPage(name: string, entry: string, outdir: string, dev = 
     outdir: resolve(outdir, name),
     sourcemap: true,
     minify: false,
+    // esbuild only defaults NODE_ENV to production when minifying, so release builds shipped
+    // React's development build. Keep development for the live dev loop, production otherwise.
+    define: { 'process.env.NODE_ENV': dev ? '"development"' : '"production"' },
     target: ["chrome58", "firefox57", "safari11", "edge18"],
     loader: {
       ".png": "dataurl",
@@ -149,6 +152,9 @@ async function buildJSPage(name: string, entry: string, outdir: string, dev: boo
     outdir: resolve(outdir, name),
     sourcemap: true,
     minify: false,
+    // esbuild only defaults NODE_ENV to production when minifying, so release builds shipped
+    // React's development build. Keep development for the live dev loop, production otherwise.
+    define: { 'process.env.NODE_ENV': dev ? '"development"' : '"production"' },
     target: ["chrome58", "firefox57", "safari11", "edge18"],
     loader: {
       ".png": "dataurl",

@@ -171,6 +171,14 @@ export interface ManifestTypeV2 {
   web_accessible_resources?: string[] | undefined;
   browser_specific_settings?: {
     gecko?: {
+      id?: string
+      strict_min_version?: string
+      data_collection_permissions?: {
+        required: string[]
+        optional?: string[]
+      }
+    }
+    gecko_android?: {
       strict_min_version?: string
     }
   },

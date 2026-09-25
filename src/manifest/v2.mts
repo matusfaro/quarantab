@@ -27,8 +27,20 @@ const manifest: ManifestTypeV2 = {
   ],
   browser_specific_settings: {
     gecko: {
-      strict_min_version: "91.1.0"
-    }
+      // Assigned by AMO when the listing was created. Every upload has to carry this same id.
+      id: "{948639ba-ea0f-4372-b152-f743cdd8571e}",
+      // data_collection_permissions below arrived in Firefox 140 (142 on Android). It is also
+      // well past the 102 that scripting.executeScript, used to cut off connections on lock, needs.
+      strict_min_version: "140.0",
+      // QuaranTab neither collects nor transmits any data
+      data_collection_permissions: {
+        required: ["none"],
+      },
+    },
+    gecko_android: {
+      // data_collection_permissions arrived later on Android
+      strict_min_version: "142.0",
+    },
   },
 };
 
